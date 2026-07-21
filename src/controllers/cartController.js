@@ -3,25 +3,33 @@ const prisma = new PrismaClient();
 
 /**
  * Contrôleur pour la gestion du panier
- * Implémente les 5 fonctions métier : récupérer, ajouter, modifier, supprimer, vider
+ * Implémente les 5 fonctions métier avec relation 1-N CartItem
  */
+
+// Fonction helper pour trouver le panier par userId
+const findByUserId = async (userId) => {
+  return await prisma.cart.findUnique({
+    where: { userId: userId },
+    include: { 
+      items: {
+        orderBy: { createdAt: 'asc' }
+      }
+    }
+  });
+};
 
 // 1. Récupérer le panier de l'utilisateur connecté
 const getCart = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.id; // Récupéré du token JWT
 
-    let cart = await prisma.cart.findUnique({
-      where: { userId: userId }
-    });
+    let cart = await findByUserId(userId);
 
     // Si aucun panier n'existe, créer un panier vide
     if (!cart) {
       cart = await prisma.cart.create({
-        data: {
-          userId: userId,
-          items: []
-        }
+        data: { userId: userId },
+        include: { items: true }
       });
     }
 
@@ -41,64 +49,62 @@ const getCart = async (req, res) => {
 // 2. Ajouter un produit au panier
 const addItemToCart = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.id; // Récupéré du token JWT
     const { product_id, quantity } = req.body;
 
-    // Validation : quantité doit être strictement positive
-    if (!quantity || quantity <= 0) {
-      return res.status(400).json({ error: "La quantité doit être supérieure à 0" });
+    // Validation : product_id doit être un UUID valide
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!product_id || !uuidRegex.test(product_id)) {
+      return res.status(400).json({ error: "Product ID invalide (UUID requis)" });
     }
 
-    if (!product_id) {
-      return res.status(400).json({ error: "Product ID invalide" });
+    // Validation : quantité doit être strictement positive
+    if (!quantity || quantity <= 0 || !Number.isInteger(quantity)) {
+      return res.status(400).json({ error: "La quantité doit être un entier supérieur à 0" });
     }
 
     // TODO: Récupérer le prix actuel du produit depuis l'API Catalogue
-    // Pour l'instant, on utilise un prix par défaut
     const price = 10.00; // À remplacer par appel API Catalogue
 
-    let cart = await prisma.cart.findUnique({
-      where: { userId: userId }
-    });
+    let cart = await findByUserId(userId);
 
     // Créer le panier s'il n'existe pas
     if (!cart) {
       cart = await prisma.cart.create({
+        data: { userId: userId },
+        include: { items: true }
+      });
+    }
+
+    // Chercher si le produit existe déjà dans le panier
+    const existingItem = cart.items.find(item => item.productId === product_id);
+
+    if (existingItem) {
+      // Produit existe déjà : incrémenter la quantité
+      await prisma.cartItem.update({
+        where: { id: existingItem.id },
+        data: { quantity: existingItem.quantity + quantity }
+      });
+    } else {
+      // Produit n'existe pas : l'ajouter
+      await prisma.cartItem.create({
         data: {
-          userId: userId,
-          items: []
+          cartId: cart.id,
+          productId: product_id,
+          quantity: quantity,
+          price: price
         }
       });
     }
 
-    let items = cart.items || [];
-    
-    // Chercher si le produit existe déjà dans le panier
-    const existingItemIndex = items.findIndex(item => item.product_id === product_id);
-
-    if (existingItemIndex !== -1) {
-      // Produit existe déjà : incrémenter la quantité
-      items[existingItemIndex].quantity += quantity;
-    } else {
-      // Produit n'existe pas : l'ajouter
-      items.push({
-        product_id: product_id,
-        quantity: quantity,
-        price: price
-      });
-    }
-
-    // Mettre à jour le panier
-    cart = await prisma.cart.update({
-      where: { userId: userId },
-      data: { items: items }
-    });
+    // Récupérer le panier mis à jour
+    const updatedCart = await findByUserId(userId);
 
     res.status(200).json({
-      userId: cart.userId,
-      items: cart.items,
-      createdAt: cart.createdAt,
-      updatedAt: cart.updatedAt
+      userId: updatedCart.userId,
+      items: updatedCart.items,
+      createdAt: updatedCart.createdAt,
+      updatedAt: updatedCart.updatedAt
     });
 
   } catch (error) {
@@ -110,38 +116,41 @@ const addItemToCart = async (req, res) => {
 // 3. Modifier la quantité d'un produit spécifique
 const updateItemQuantity = async (req, res) => {
   try {
-    const userId = req.user.id;
-    const product_id = parseInt(req.params.product_id);
+    const userId = req.user.id; // Récupéré du token JWT
+    const product_id = req.params.product_id;
     const { quantity } = req.body;
 
-    // Validation : quantité doit être strictement positive
-    if (!quantity || quantity <= 0) {
-      return res.status(400).json({ error: "La quantité doit être supérieure à 0" });
+    // Validation : product_id doit être un UUID valide
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(product_id)) {
+      return res.status(400).json({ error: "Product ID invalide (UUID requis)" });
     }
 
-    const cart = await prisma.cart.findUnique({
-      where: { userId: userId }
-    });
+    // Validation : quantité doit être strictement positive
+    if (!quantity || quantity <= 0 || !Number.isInteger(quantity)) {
+      return res.status(400).json({ error: "La quantité doit être un entier supérieur à 0" });
+    }
+
+    const cart = await findByUserId(userId);
 
     if (!cart) {
       return res.status(404).json({ error: "Panier non trouvé" });
     }
 
-    let items = cart.items || [];
-    const itemIndex = items.findIndex(item => item.product_id === product_id);
+    const existingItem = cart.items.find(item => item.productId === product_id);
 
-    if (itemIndex === -1) {
+    if (!existingItem) {
       return res.status(404).json({ error: "Produit non trouvé dans le panier" });
     }
 
     // Mettre à jour la quantité
-    items[itemIndex].quantity = quantity;
-
-    // Sauvegarder les changements
-    const updatedCart = await prisma.cart.update({
-      where: { userId: userId },
-      data: { items: items }
+    await prisma.cartItem.update({
+      where: { id: existingItem.id },
+      data: { quantity: quantity }
     });
+
+    // Récupérer le panier mis à jour
+    const updatedCart = await findByUserId(userId);
 
     res.status(200).json({
       userId: updatedCart.userId,
@@ -159,32 +168,34 @@ const updateItemQuantity = async (req, res) => {
 // 4. Retirer un produit spécifique du panier
 const removeItemFromCart = async (req, res) => {
   try {
-    const userId = req.user.id;
-    const product_id = parseInt(req.params.product_id);
+    const userId = req.user.id; // Récupéré du token JWT
+    const product_id = req.params.product_id;
 
-    const cart = await prisma.cart.findUnique({
-      where: { userId: userId }
-    });
+    // Validation : product_id doit être un UUID valide
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(product_id)) {
+      return res.status(400).json({ error: "Product ID invalide (UUID requis)" });
+    }
+
+    const cart = await findByUserId(userId);
 
     if (!cart) {
       return res.status(404).json({ error: "Panier non trouvé" });
     }
 
-    let items = cart.items || [];
-    const itemIndex = items.findIndex(item => item.product_id === product_id);
+    const existingItem = cart.items.find(item => item.productId === product_id);
 
-    if (itemIndex === -1) {
+    if (!existingItem) {
       return res.status(404).json({ error: "Produit non trouvé dans le panier" });
     }
 
-    // Retirer l'article du tableau
-    items.splice(itemIndex, 1);
-
-    // Sauvegarder les changements
-    const updatedCart = await prisma.cart.update({
-      where: { userId: userId },
-      data: { items: items }
+    // Supprimer l'article (onDelete: Cascade gère automatiquement)
+    await prisma.cartItem.delete({
+      where: { id: existingItem.id }
     });
+
+    // Récupérer le panier mis à jour
+    const updatedCart = await findByUserId(userId);
 
     res.status(200).json({
       userId: updatedCart.userId,
@@ -202,40 +213,31 @@ const removeItemFromCart = async (req, res) => {
 // 5. Vider complètement le panier
 const clearCart = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.id; // Récupéré du token JWT
 
-    const cart = await prisma.cart.findUnique({
-      where: { userId: userId }
-    });
+    let cart = await findByUserId(userId);
 
     if (!cart) {
       // Créer un panier vide s'il n'existe pas
-      const newCart = await prisma.cart.create({
-        data: {
-          userId: userId,
-          items: []
-        }
+      cart = await prisma.cart.create({
+        data: { userId: userId },
+        include: { items: true }
       });
-
-      return res.status(200).json({
-        userId: newCart.userId,
-        items: newCart.items,
-        createdAt: newCart.createdAt,
-        updatedAt: newCart.updatedAt
+    } else {
+      // Supprimer tous les items (onDelete: Cascade)
+      await prisma.cartItem.deleteMany({
+        where: { cartId: cart.id }
       });
     }
 
-    // Vider le panier (items = [])
-    const updatedCart = await prisma.cart.update({
-      where: { userId: userId },
-      data: { items: [] }
-    });
+    // Récupérer le panier vide
+    const emptyCart = await findByUserId(userId);
 
     res.status(200).json({
-      userId: updatedCart.userId,
-      items: updatedCart.items,
-      createdAt: updatedCart.createdAt,
-      updatedAt: updatedCart.updatedAt
+      userId: emptyCart.userId,
+      items: emptyCart.items,
+      createdAt: emptyCart.createdAt,
+      updatedAt: emptyCart.updatedAt
     });
 
   } catch (error) {
@@ -249,5 +251,6 @@ module.exports = {
   addItemToCart,
   updateItemQuantity,
   removeItemFromCart,
-  clearCart
+  clearCart,
+  findByUserId // Export pour tests
 };
