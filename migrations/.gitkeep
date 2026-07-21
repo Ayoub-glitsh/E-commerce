@@ -1,0 +1,2 @@
+# Ce fichier maintient le dossier migrations/ dans git
+# Les migrations seront créées avec: npm run migration:generate -- --name nom-migration
