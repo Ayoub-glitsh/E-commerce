@@ -1,0 +1,2 @@
+# Ce fichier maintient le dossier seeders/ dans git  
+# Les seeders seront créés avec: npm run seed:generate -- --name nom-seeder
