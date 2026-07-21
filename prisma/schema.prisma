@@ -15,4 +15,16 @@ model User {
   id    Int     @id @default(autoincrement())
   email String  @unique
   name  String?
+  cart  Cart?   @relation("UserCart")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Cart {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  user      User     @relation("UserCart", fields: [userId], references: [id])
+  items     Json     // Array of {product_id: Int, quantity: Int, price: Decimal}
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
