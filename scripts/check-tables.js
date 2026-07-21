@@ -46,7 +46,7 @@ async function checkTables() {
     console.log('');
     log(colors.blue, '🎯 Tables du projet (Prisma):');
     
-    const expectedTables = ['User', 'Cart', 'CartItem'];
+    const expectedTables = ['users', 'categories', 'products', 'reviews', 'carts', 'cart_items', 'orders', 'user_events'];
     
     for (const tableName of expectedTables) {
       const found = results.some(row => row.table_name.toLowerCase() === tableName.toLowerCase());
