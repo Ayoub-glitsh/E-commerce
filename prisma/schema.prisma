@@ -1,43 +1,165 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Get a free hosted Postgres database in seconds: `npx create-db`//
-
 generator client {
-  provider = "prisma-client"
+  provider = "prisma-client-js"
   output   = "../generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
 }
+
+// Enums
+enum UserRole {
+  client
+  admin
+}
+
+enum OrderStatus {
+  pending
+  confirmed
+  processing
+  shipped
+  delivered
+  cancelled
+}
+
+// 1. Table: users
 model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  password     String
+  role         UserRole  @default(client)
+  refreshToken String?   @map("refresh_token") @db.Text
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  reviews    Review[]
+  cart       Cart?
+  orders     Order[]
+  userEvents UserEvent[]
+
+  @@map("users")
+}
+
+// 2. Table: categories
+model Category {
   id        String   @id @default(uuid())
-  email     String   @unique
-  name      String?
-  cart      Cart?    @relation("UserCart")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  products Product[]
+
+  @@map("categories")
 }
 
+// 3. Table: products
+model Product {
+  id          String   @id @default(uuid())
+  name        String
+  description String?  @db.Text
+  price       Decimal  @db.Decimal(10, 2)
+  stock       Int
+  categoryId  String   @map("category_id")
+  images      String[] // Array of image URLs
+  tags        String[] // Array of tags for search
+  ratingAvg   Decimal  @default(0) @map("rating_avg") @db.Decimal(3, 2)
+  ratingCount Int      @default(0) @map("rating_count")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  category   Category    @relation(fields: [categoryId], references: [id])
+  reviews    Review[]
+  cartItems  CartItem[]
+  userEvents UserEvent[]
+
+  @@map("products")
+}
+
+// 4. Table: reviews
+model Review {
+  id        String   @id @default(uuid())
+  productId String   @map("product_id")
+  userId    String   @map("user_id")
+  rating    Int      // 1 to 5
+  comment   String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  product Product @relation(fields: [productId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@map("reviews")
+}
+
+// 5. Table: carts
 model Cart {
-  id        String     @id @default(uuid())
-  userId    String     @unique
-  user      User       @relation("UserCart", fields: [userId], references: [id], onDelete: Cascade)
-  items     CartItem[]
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id        String   @id @default(uuid())
+  userId    String   @unique @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items CartItem[]
+
+  @@map("carts")
 }
 
+// 6. Table: cart_items
 model CartItem {
-  id         String   @id @default(uuid())
-  cartId     String
-  cart       Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  productId  String   // UUID du produit
-  quantity   Int
-  price      Decimal  @db.Decimal(10, 2)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id        String   @id @default(uuid())
+  cartId    String   @map("cart_id")
+  productId String   @map("product_id")
+  quantity  Int      // Must be > 0 (enforced in application logic)
+  price     Decimal  @db.Decimal(10, 2)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  @@unique([cartId, productId]) // Un produit unique par panier
+  // Relations
+  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  // Unique constraint
+  @@unique([cartId, productId])
+  @@map("cart_items")
+}
+
+// 7. Table: orders
+model Order {
+  id                    String      @id @default(uuid())
+  userId                String      @map("user_id")
+  items                 Json        // JSON snapshot of ordered products
+  totalAmount           Decimal     @map("total_amount") @db.Decimal(10, 2)
+  status                OrderStatus @default(pending)
+  shippingAddress       Json        @map("shipping_address") // JSON shipping address
+  stripePaymentIntentId String?     @map("stripe_payment_intent_id")
+  createdAt             DateTime    @default(now()) @map("created_at")
+  updatedAt             DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("orders")
+}
+
+// 8. Table: user_events
+model UserEvent {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  eventType String   @map("event_type") // e.g., 'view', 'purchase'
+  productId String   @map("product_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user    User    @relation(fields: [userId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("user_events")
 }
