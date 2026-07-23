@@ -329,13 +329,33 @@ Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de 
 <sub>Lead Developer</sub>
 </a>
 </td>
+  
 <td align="center">
 <a href="https://github.com/oumayma728">
 <img src="https://github.com/oumayma728.png" width="100px;" alt="Oumayma"/><br />
 <sub><b>Oumayma</b></sub><br />
 <sub>Scrum Master</sub>
 </a>
+</td> 
+
+<td align="center">
+<a href="https://github.com/Elmahdi45">
+<img src="https://github.com/Elmahdi45.png" width="100px;" alt="Elmahdi45"/><br />
+<sub><b>Oumayma</b></sub><br />
+<sub>Scrum Master</sub>
+</a>
 </td>
+
+<td align="center">
+<a href="https://github.com/AITHMAID-AYOUB">
+<img src="https://github.com/AITHMAID-AYOUB.png" width="100px;" alt="Elmahdi45"/><br />
+<sub><b>Oumayma</b></sub><br />
+<sub>Scrum Master</sub>
+</a>
+</td>
+
+
+
 <!-- Ajoutez les autres développeurs ici -->
 </tr>
 </table>
