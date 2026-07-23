@@ -29,6 +29,7 @@ enum OrderStatus {
 model User {
   id           String    @id @default(uuid())
   email        String    @unique
+  name         String?                     // ← Added
   password     String
   role         UserRole  @default(client)
   refreshToken String?   @map("refresh_token") @db.Text
@@ -40,16 +41,18 @@ model User {
   cart       Cart?
   orders     Order[]
   userEvents UserEvent[]
+  wishlist   WishlistItem[]   // ← Added
 
   @@map("users")
 }
 
 // 2. Table: categories
 model Category {
-  id        String   @id @default(uuid())
-  name      String
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Relations
   products Product[]
@@ -63,21 +66,22 @@ model Product {
   name        String
   description String?  @db.Text
   price       Decimal  @db.Decimal(10, 2)
-  stock       Int
+  stock       Int      @default(0)
   categoryId  String   @map("category_id")
-  images      String[] // Array of image URLs
-  tags        String[] // Array of tags for search
+  images      String[] @default([])
+  tags        String[] @default([])
+  isActive    Boolean  @default(true) @map("is_active")
   ratingAvg   Decimal  @default(0) @map("rating_avg") @db.Decimal(3, 2)
   ratingCount Int      @default(0) @map("rating_count")
-  isActive    Boolean  @default(true) @map("is_active")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Relations
-  category   Category    @relation(fields: [categoryId], references: [id])
+  category   Category       @relation(fields: [categoryId], references: [id])
   reviews    Review[]
   cartItems  CartItem[]
   userEvents UserEvent[]
+  wishlist   WishlistItem[]
 
   @@map("products")
 }
@@ -92,7 +96,7 @@ model Review {
   createdAt DateTime @default(now()) @map("created_at")
 
   // Relations
-  product Product @relation(fields: [productId], references: [id])
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   user    User    @relation(fields: [userId], references: [id])
 
   @@map("reviews")
@@ -155,6 +159,7 @@ model UserEvent {
   userId    String   @map("user_id")
   eventType String   @map("event_type") // e.g., 'view', 'purchase'
   productId String   @map("product_id")
+  metadata  Json?                     // ← Added
   createdAt DateTime @default(now()) @map("created_at")
 
   // Relations
@@ -162,4 +167,20 @@ model UserEvent {
   product Product @relation(fields: [productId], references: [id])
 
   @@map("user_events")
+}
+
+// New model: WishlistItem
+model WishlistItem {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  productId String   @map("product_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user    User    @relation(fields: [userId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  // Unique constraint
+  @@unique([userId, productId])
+  @@map("wishlist_items")
 }
