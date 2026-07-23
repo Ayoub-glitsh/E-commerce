@@ -84,40 +84,28 @@ E-commerce/
 └── 📄 .env.example
 ```
 
-## 🛠️ Stack Technique
 
-### Backend
-<div align="center">
 
-![Node.js](https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white)
-![Express.js](https://img.shields.io/badge/Express.js-404D59?style=for-the-badge&logo=express&logoColor=white)
-![Prisma](https://img.shields.io/badge/Prisma-3982CE?style=for-the-badge&logo=Prisma&logoColor=white)
-![Sequelize](https://img.shields.io/badge/Sequelize-52B0E7?style=for-the-badge&logo=Sequelize&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)
+## 🛠️ Technical Stack
 
-</div>
+| Category | Technology |
+|----------|------------|
+| 🚀 **Runtime** | <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nodejs/nodejs-original.svg" width="22"/> **Node.js** &nbsp;&nbsp; <img src="https://cdn.simpleicons.org/javascript/F7DF1E" width="22"/> **CommonJS** |
+| ⚡ **Framework** | <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/express/express-original.svg" width="22"/> **Express.js 5** |
+| 🗄️ **Database** | <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/postgresql/postgresql-original.svg" width="22"/> **PostgreSQL (Neon Serverless)** |
+| 🔗 **ORM** | <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/prisma/prisma-original.svg" width="22"/> **Prisma 7** &nbsp;&nbsp; <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/sequelize/sequelize-original.svg" width="22"/> **Sequelize 6** |
+| 🔐 **Authentication** | <img src="https://jwt.io/img/pic_logo.svg" width="22"/> **JWT** |
+| 🛡️ **Security** | <img src="https://cdn.simpleicons.org/cors/00599C" width="22"/> **CORS** &nbsp;&nbsp; 🔒 **SSL/TLS** |
+| ☁️ **Cloud Database** | <img src="https://cdn.simpleicons.org/neon/00E599" width="22"/> **Neon PostgreSQL** |
+| 🧰 **Development** | <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/npm/npm-original-wordmark.svg" width="22"/> **npm** &nbsp;&nbsp; <img src="https://cdn.simpleicons.org/nodemon/76D04B" width="22"/> **Nodemon** &nbsp;&nbsp; <img src="https://cdn.simpleicons.org/dotenv/ECD53F" width="22"/> **dotenv** |
+| 🌐 **API** | <img src="https://cdn.simpleicons.org/openapiinitiative/6BA539" width="22"/> **REST API** |
+| 📝 **Version Control** | <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/git/git-original.svg" width="22"/> **Git** &nbsp;&nbsp; <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg" width="22"/> **GitHub** |
+| 🆔 **Identifiers** | 🆔 **UUID v4** |
+| 📊 **Database Features** | **JSONB**, **Arrays**, **Enums**, **Cascade Relations** |
+| 🔄 **Database Management** | <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/prisma/prisma-original.svg" width="22"/> **Prisma Migrations** &nbsp;&nbsp; <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/sequelize/sequelize-original.svg" width="22"/> **Sequelize Seeders** |
 
-### Frontend
-<div align="center">
 
-![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
-![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)
-![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
-![Zustand](https://img.shields.io/badge/Zustand-FF4154?style=for-the-badge&logo=zustand&logoColor=white)
-
-</div>
-
-### Outils de Développement
-<div align="center">
-
-![Git](https://img.shields.io/badge/Git-F05032?style=for-the-badge&logo=git&logoColor=white)
-![GitHub](https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white)
-![Neon](https://img.shields.io/badge/Neon-00E699?style=for-the-badge&logo=neon&logoColor=white)
-![Nodemon](https://img.shields.io/badge/Nodemon-76D04B?style=for-the-badge&logo=nodemon&logoColor=white)
-
-</div>
-
-### Structure du Projet
+## Structure du Projet
 
 ```
 E-commerce/
