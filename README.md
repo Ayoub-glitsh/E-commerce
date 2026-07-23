@@ -15,11 +15,13 @@
 # 🛒 E-commerce Platform
 
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
+[![React](https://img.shields.io/badge/React-18+-blue.svg)](https://reactjs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-blue.svg)](https://postgresql.org/)
 [![Prisma](https://img.shields.io/badge/Prisma-5+-purple.svg)](https://prisma.io/)
+[![Vite](https://img.shields.io/badge/Vite-5+-646CFF.svg)](https://vitejs.dev/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> Une plateforme e-commerce moderne et scalable construite avec Node.js, PostgreSQL et Prisma.
+> Une plateforme e-commerce moderne et scalable construite avec Node.js, React, PostgreSQL et Prisma.
 
 ## 📋 Table des Matières
 
@@ -56,6 +58,64 @@ Cette plateforme e-commerce offre une solution complète pour la gestion d'une b
 - **Authentification:** JWT (JSON Web Tokens)
 - **Validation:** Joi/Yup
 - **Documentation:** Swagger/OpenAPI
+
+### Stack Technique
+
+```
+E-commerce/
+├── 📁 config/                 # Configuration DB
+├── 📁 migrations/             # Migrations Sequelize
+├── 📁 models/                 # Modèles Sequelize
+├── 📁 prisma/                 # Schema Prisma
+├── 📁 scripts/                # Scripts utilitaires
+├── 📁 seeders/                # Données de test
+├── 📁 src/
+│   ├── 📁 controllers/        # Contrôleurs API
+│   ├── 📁 middleware/         # Middlewares (auth, validation)
+│   ├── 📁 routes/             # Définition des routes
+│   └── 📁 services/           # Logique métier
+├── 📁 frontend/               # Application React
+│   ├── 📁 src/
+│   │   ├── 📁 components/     # Composants React
+│   │   ├── 📁 store/          # State management
+│   │   └── 📁 mocks/          # Mock Service Worker
+├── 📄 package.json
+├── 📄 README.md
+└── 📄 .env.example
+```
+
+## 🛠️ Stack Technique
+
+### Backend
+<div align="center">
+
+![Node.js](https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white)
+![Express.js](https://img.shields.io/badge/Express.js-404D59?style=for-the-badge&logo=express&logoColor=white)
+![Prisma](https://img.shields.io/badge/Prisma-3982CE?style=for-the-badge&logo=Prisma&logoColor=white)
+![Sequelize](https://img.shields.io/badge/Sequelize-52B0E7?style=for-the-badge&logo=Sequelize&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)
+
+</div>
+
+### Frontend
+<div align="center">
+
+![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)
+![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
+![Zustand](https://img.shields.io/badge/Zustand-FF4154?style=for-the-badge&logo=zustand&logoColor=white)
+
+</div>
+
+### Outils de Développement
+<div align="center">
+
+![Git](https://img.shields.io/badge/Git-F05032?style=for-the-badge&logo=git&logoColor=white)
+![GitHub](https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white)
+![Neon](https://img.shields.io/badge/Neon-00E699?style=for-the-badge&logo=neon&logoColor=white)
+![Nodemon](https://img.shields.io/badge/Nodemon-76D04B?style=for-the-badge&logo=nodemon&logoColor=white)
+
+</div>
 
 ### Structure du Projet
 
@@ -317,6 +377,8 @@ docker-compose up -d
 ## 📄 License
 
 Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de détails.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## 👥 Auteurs et Contributeurs
 
