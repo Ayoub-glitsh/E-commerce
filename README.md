@@ -1,11 +1,27 @@
+<p align="center">
+  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nodejs/nodejs-original.svg" height="50" alt="Node.js"/>
+  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/express/express-original.svg" height="50" alt="Express"/>
+  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/postgresql/postgresql-original.svg" height="50" alt="PostgreSQL"/>
+  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/prisma/prisma-original.svg" height="50" alt="Prisma"/>
+  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/sequelize/sequelize-original.svg" height="50" alt="Sequelize"/>
+  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg" height="50" alt="GitHub"/>
+</p>
+
+
+<div align="center">
+  <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=28&pause=1000&color=00C2FF&center=true&vCenter=true&width=1000&lines=E-commerce+Platform;AI-Powered+Intelligent+Platform;Created+by+the+Interns+of+3LM+Solutions" alt="Typing SVG" />
+</div>
+
 # 🛒 E-commerce Platform
 
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
+[![React](https://img.shields.io/badge/React-18+-blue.svg)](https://reactjs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-blue.svg)](https://postgresql.org/)
 [![Prisma](https://img.shields.io/badge/Prisma-5+-purple.svg)](https://prisma.io/)
+[![Vite](https://img.shields.io/badge/Vite-5+-646CFF.svg)](https://vitejs.dev/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> Une plateforme e-commerce moderne et scalable construite avec Node.js, PostgreSQL et Prisma.
+> Une plateforme e-commerce moderne et scalable construite avec Node.js, React, PostgreSQL et Prisma.
 
 ## 📋 Table des Matières
 
@@ -43,7 +59,53 @@ Cette plateforme e-commerce offre une solution complète pour la gestion d'une b
 - **Validation:** Joi/Yup
 - **Documentation:** Swagger/OpenAPI
 
-### Structure du Projet
+### Stack Technique
+
+```
+E-commerce/
+├── 📁 config/                 # Configuration DB
+├── 📁 migrations/             # Migrations Sequelize
+├── 📁 models/                 # Modèles Sequelize
+├── 📁 prisma/                 # Schema Prisma
+├── 📁 scripts/                # Scripts utilitaires
+├── 📁 seeders/                # Données de test
+├── 📁 src/
+│   ├── 📁 controllers/        # Contrôleurs API
+│   ├── 📁 middleware/         # Middlewares (auth, validation)
+│   ├── 📁 routes/             # Définition des routes
+│   └── 📁 services/           # Logique métier
+├── 📁 frontend/               # Application React
+│   ├── 📁 src/
+│   │   ├── 📁 components/     # Composants React
+│   │   ├── 📁 store/          # State management
+│   │   └── 📁 mocks/          # Mock Service Worker
+├── 📄 package.json
+├── 📄 README.md
+└── 📄 .env.example
+```
+
+
+
+## 🛠️ Technical Stack
+
+| Category | Technology |
+|----------|------------|
+| 🚀 **Runtime** | <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nodejs/nodejs-original.svg" width="22"/> **Node.js** &nbsp;&nbsp; <img src="https://cdn.simpleicons.org/javascript/F7DF1E" width="22"/> **CommonJS** |
+| ⚡ **Framework** | <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/express/express-original.svg" width="22"/> **Express.js 5** |
+| 🗄️ **Database** | <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/postgresql/postgresql-original.svg" width="22"/> **PostgreSQL (Neon Serverless)** |
+| 🔗 **ORM** | <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/prisma/prisma-original.svg" width="22"/> **Prisma 7** &nbsp;&nbsp; <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/sequelize/sequelize-original.svg" width="22"/> **Sequelize 6** |
+| 🔐 **Authentication** | <img src="https://jwt.io/img/pic_logo.svg" width="22"/> **JWT** |
+| 🛡️ **Security** | <img src="https://cdn.simpleicons.org/cors/00599C" width="22"/> **CORS** &nbsp;&nbsp; 🔒 **SSL/TLS** |
+| ☁️ **Cloud Database** | <img src="https://cdn.simpleicons.org/neon/00E599" width="22"/> **Neon PostgreSQL** |
+| 🧰 **Development** | <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/npm/npm-original-wordmark.svg" width="22"/> **npm** &nbsp;&nbsp; <img src="https://cdn.simpleicons.org/nodemon/76D04B" width="22"/> **Nodemon** &nbsp;&nbsp; <img src="https://cdn.simpleicons.org/dotenv/ECD53F" width="22"/> **dotenv** |
+| 🌐 **API** | <img src="https://cdn.simpleicons.org/openapiinitiative/6BA539" width="22"/> **REST API** |
+| 📝 **Version Control** | <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/git/git-original.svg" width="22"/> **Git** &nbsp;&nbsp; <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg" width="22"/> **GitHub** |
+| 🆔 **Identifiers** | 🆔 **UUID v4** |
+| 📊 **Database Features** | **JSONB**, **Arrays**, **Enums**, **Cascade Relations** |
+| 🔄 **Database Management** | <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/prisma/prisma-original.svg" width="22"/> **Prisma Migrations** &nbsp;&nbsp; <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/sequelize/sequelize-original.svg" width="22"/> **Sequelize Seeders** |
+
+
+## Structure du Projet
 
 ```
 E-commerce/
@@ -304,11 +366,52 @@ docker-compose up -d
 
 Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de détails.
 
-## 👨‍💻 Auteur
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Ayoub Aguezar**
-- GitHub: [@Ayoub-glitsh](https://github.com/Ayoub-glitsh)
-- Email: ayoubaguezzar1@gmail.com
+## 👥 Auteurs et Contributeurs
+
+<table>
+<tr>
+<td align="center">
+<a href="https://github.com/Ayoub-glitsh">
+<img src="https://github.com/Ayoub-glitsh.png" width="100px;" alt="Ayoub Aguezar"/><br />
+<sub><b>Ayoub Aguezar</b></sub><br />
+<sub>Lead Developer</sub>
+</a>
+</td>
+  
+<td align="center">
+<a href="https://github.com/oumayma728">
+<img src="https://github.com/oumayma728.png" width="100px;" alt="Oumayma"/><br />
+<sub><b>Oumayma</b></sub><br />
+<sub>Scrum Master</sub>
+</a>
+</td> 
+
+<td align="center">
+<a href="https://github.com/Elmahdi45">
+<img src="https://github.com/Elmahdi45.png" width="100px;" alt="Elmahdi45"/><br />
+<sub><b>Oumayma</b></sub><br />
+<sub>Scrum Master</sub>
+</a>
+</td>
+
+<td align="center">
+<a href="https://github.com/AITHMAID-AYOUB">
+<img src="https://github.com/AITHMAID-AYOUB.png" width="100px;" alt="Elmahdi45"/><br />
+<sub><b>Oumayma</b></sub><br />
+<sub>Scrum Master</sub>
+</a>
+</td>
+
+
+
+<!-- Ajoutez les autres développeurs ici -->
+</tr>
+</table>
+
+### 📧 Contact
+- **Ayoub Aguezar**: ayoubaguezzar1@gmail.com
 
 ## 🙏 Remerciements
 
