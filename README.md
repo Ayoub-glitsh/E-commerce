@@ -391,16 +391,16 @@ Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de 
 <td align="center">
 <a href="https://github.com/Elmahdi45">
 <img src="https://github.com/Elmahdi45.png" width="100px;" alt="Elmahdi45"/><br />
-<sub><b>Oumayma</b></sub><br />
-<sub>Scrum Master</sub>
+<sub><b>Elmahdi45</b></sub><br />
+<sub>Developer</sub>
 </a>
 </td>
 
 <td align="center">
 <a href="https://github.com/AITHMAID-AYOUB">
-<img src="https://github.com/AITHMAID-AYOUB.png" width="100px;" alt="Elmahdi45"/><br />
-<sub><b>Oumayma</b></sub><br />
-<sub>Scrum Master</sub>
+<img src="https://github.com/AITHMAID-AYOUB.png" width="100px;" alt="AITHMAID-AYOUB"/><br />
+<sub><b>AITHMAID-AYOUB</b></sub><br />
+<sub>Developer</sub>
 </a>
 </td>
 
