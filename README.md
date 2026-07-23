@@ -304,11 +304,30 @@ docker-compose up -d
 
 Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de détails.
 
-## 👨‍💻 Auteur
+## 👥 Auteurs et Contributeurs
 
-**Ayoub Aguezar**
-- GitHub: [@Ayoub-glitsh](https://github.com/Ayoub-glitsh)
-- Email: ayoubaguezzar1@gmail.com
+<table>
+<tr>
+<td align="center">
+<a href="https://github.com/Ayoub-glitsh">
+<img src="https://github.com/Ayoub-glitsh.png" width="100px;" alt="Ayoub Aguezar"/><br />
+<sub><b>Ayoub Aguezar</b></sub><br />
+<sub>Lead Developer</sub>
+</a>
+</td>
+<td align="center">
+<a href="https://github.com/oumayma728">
+<img src="https://github.com/oumayma728.png" width="100px;" alt="Oumayma"/><br />
+<sub><b>Oumayma</b></sub><br />
+<sub>Scrum Master</sub>
+</a>
+</td>
+<!-- Ajoutez les autres développeurs ici -->
+</tr>
+</table>
+
+### 📧 Contact
+- **Ayoub Aguezar**: ayoubaguezzar1@gmail.com
 
 ## 🙏 Remerciements
 
