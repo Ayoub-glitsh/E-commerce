@@ -4,7 +4,8 @@ const cors = require('cors');
 
 // Importation des routes
 const authRoutes = require('./routes/auth');
-const cartRoutes = require('./controllers/cartController');
+const catalogRoutes = require('./routes/catalog');
+// const cartRoutes = require('./controllers/cartController');
 
 // Initialisation de l'application Express
 const app = express();
@@ -44,8 +45,11 @@ app.get('/health', (req, res) => {
 // Routes d'authentification
 app.use('/api/auth', authRoutes);
 
-// Routes du panier (existantes)
-app.use('/api/cart', cartRoutes);
+// Routes du catalogue (publiques)
+app.use('/api', catalogRoutes);
+
+// Routes du panier (temporairement désactivées)
+// app.use('/api/cart', cartRoutes);
 
 // Route de test de la base de données
 app.get('/api/test-db', async (req, res) => {
@@ -71,8 +75,41 @@ app.get('/api/test-db', async (req, res) => {
   }
 });
 
+// Route de test du catalogue
+app.get('/api/test-catalog', async (req, res) => {
+  try {
+    const { Product, Category } = require('../models');
+    
+    const categoryCount = await Category.count();
+    const productCount = await Product.count();
+    
+    // Test simple d'un produit
+    const firstProduct = await Product.findOne({
+      attributes: ['id', 'name', 'price'],
+      raw: true
+    });
+    
+    res.status(200).json({
+      success: true,
+      message: 'Catalogue test réussi',
+      data: {
+        categoryCount,
+        productCount,
+        sampleProduct: firstProduct
+      }
+    });
+  } catch (error) {
+    console.error('Erreur test catalogue:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur test catalogue',
+      error: error.message
+    });
+  }
+});
+
 // Gestion des routes non trouvées
-app.use('*', (req, res) => {
+app.use((req, res) => {
   res.status(404).json({
     success: false,
     message: 'Endpoint non trouvé',
@@ -85,6 +122,10 @@ app.use('*', (req, res) => {
       'POST /api/auth/refresh', 
       'GET /api/auth/me',
       'GET /api/auth/verify',
+      'GET /api/products',
+      'GET /api/products/:id',
+      'GET /api/products/search/suggestions',
+      'GET /api/categories',
       'GET /api/cart',
       'POST /api/cart/add',
       'PUT /api/cart/update',
@@ -124,6 +165,8 @@ if (require.main === module) {
     console.log(`✅ Serveur démarré sur http://localhost:${PORT}`);
     console.log(`🔗 API Health check: http://localhost:${PORT}/health`);
     console.log(`🔑 Authentication endpoint: http://localhost:${PORT}/api/auth`);
+    console.log(`📦 Catalog endpoint: http://localhost:${PORT}/api/products`);
+    console.log(`🏷️ Categories endpoint: http://localhost:${PORT}/api/categories`);
     console.log(`🛒 Cart endpoint: http://localhost:${PORT}/api/cart`);
   });
 }

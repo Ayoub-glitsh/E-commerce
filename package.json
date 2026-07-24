@@ -18,6 +18,8 @@
     "db:test-connection": "node scripts/test-db-connection.js",
     "db:validate-config": "node scripts/validate-config.js",
     "db:check-tables": "node scripts/check-tables.js",
+    "catalog:test": "node scripts/test-catalog-api.js",
+    "catalog:seed": "node scripts/create-catalog-data.js",
     "migration:generate": "sequelize-cli migration:generate --name",
     "seed:generate": "sequelize-cli seed:generate --name",
     "prisma:migrate": "prisma migrate dev",
