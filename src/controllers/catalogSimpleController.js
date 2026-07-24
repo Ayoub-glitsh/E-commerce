@@ -15,7 +15,8 @@ class CatalogSimpleController {
       const {
         page = 1,
         limit = 10,
-        search
+        search,
+        categoryId
       } = req.query;
 
       const pageNum = Math.max(1, parseInt(page, 10) || 1);
@@ -27,6 +28,11 @@ class CatalogSimpleController {
         isActive: true
       };
 
+      // Filtre par catégorie
+      if (categoryId) {
+        whereConditions.categoryId = categoryId;
+      }
+
       // Filtre de recherche textuelle
       if (search && search.trim()) {
         const searchTerm = search.trim();
@@ -36,7 +42,7 @@ class CatalogSimpleController {
         ];
       }
 
-      // Requête simple avec inclusion de catégorie
+      // Requête avec inclusion de catégorie
       const result = await Product.findAndCountAll({
         where: whereConditions,
         include: [
@@ -46,14 +52,14 @@ class CatalogSimpleController {
             attributes: ['id', 'name', 'description']
           }
         ],
-        attributes: ['id', 'name', 'description', 'price', 'stock', 'images', 'tags', 'isActive'],
-        order: [['createdAt', 'DESC']],
+        attributes: ['id', 'name', 'description', 'price', 'stock', 'categoryId', 'images', 'tags', 'isActive'],
+        order: [['created_at', 'DESC']],
         limit: limitNum,
         offset: offset,
         distinct: true
       });
 
-      // Formatage simple de la réponse
+      // Formatage de la réponse avec catégorie
       const formattedProducts = result.rows.map(product => ({
         id: product.id,
         name: product.name,
@@ -63,6 +69,7 @@ class CatalogSimpleController {
         images: product.images || [],
         tags: product.tags || [],
         isActive: product.isActive,
+        categoryId: product.categoryId,
         category: product.category ? {
           id: product.category.id,
           name: product.category.name,

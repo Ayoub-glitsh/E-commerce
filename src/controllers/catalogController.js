@@ -113,7 +113,7 @@ class CatalogController {
         attributes: {
           exclude: [] // Inclure tous les champs
         },
-        order: [[sortField, sortDirection.toUpperCase()]],
+        order: [[sortField === 'createdAt' ? 'created_at' : sortField, sortDirection.toUpperCase()]],
         limit: limitNum,
         offset: offset,
         distinct: true // Important pour le count avec les JOINs
