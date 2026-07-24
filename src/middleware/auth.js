@@ -28,7 +28,7 @@ const verifyToken = (req, res, next) => {
     req.user = {
       id: decoded.userId,    // UUID récupéré du token
       email: decoded.email,
-      role: decoded.role || 'user'
+      role: decoded.role || 'client'
     };
 
     // Validation que l'ID utilisateur est bien un UUID

@@ -5,6 +5,7 @@ const cors = require('cors');
 // Importation des routes
 const authRoutes = require('./routes/auth');
 const catalogRoutes = require('./routes/catalog');
+const adminRoutes = require('./routes/admin');
 // const cartRoutes = require('./controllers/cartController');
 
 // Initialisation de l'application Express
@@ -47,6 +48,9 @@ app.use('/api/auth', authRoutes);
 
 // Routes du catalogue (publiques)
 app.use('/api', catalogRoutes);
+
+// Routes d'administration (admin uniquement)
+app.use('/api/admin', adminRoutes);
 
 // Routes du panier (temporairement désactivées)
 // app.use('/api/cart', cartRoutes);
@@ -116,6 +120,7 @@ app.use((req, res) => {
     availableEndpoints: [
       'GET /health',
       'GET /api/test-db',
+      'GET /api/test-catalog',
       'POST /api/auth/register',
       'POST /api/auth/login',
       'POST /api/auth/logout',
@@ -124,8 +129,11 @@ app.use((req, res) => {
       'GET /api/auth/verify',
       'GET /api/products',
       'GET /api/products/:id',
-      'GET /api/products/search/suggestions',
       'GET /api/categories',
+      'GET /api/admin/products (ADMIN)',
+      'POST /api/admin/products (ADMIN)',
+      'PUT /api/admin/products/:id (ADMIN)',
+      'DELETE /api/admin/products/:id (ADMIN)',
       'GET /api/cart',
       'POST /api/cart/add',
       'PUT /api/cart/update',
@@ -167,6 +175,7 @@ if (require.main === module) {
     console.log(`🔑 Authentication endpoint: http://localhost:${PORT}/api/auth`);
     console.log(`📦 Catalog endpoint: http://localhost:${PORT}/api/products`);
     console.log(`🏷️ Categories endpoint: http://localhost:${PORT}/api/categories`);
+    console.log(`⚡ Admin endpoint: http://localhost:${PORT}/api/admin (Admin only)`);
     console.log(`🛒 Cart endpoint: http://localhost:${PORT}/api/cart`);
   });
 }

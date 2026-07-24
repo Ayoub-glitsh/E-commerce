@@ -20,6 +20,7 @@
     "db:check-tables": "node scripts/check-tables.js",
     "catalog:test": "node scripts/test-catalog-api.js",
     "catalog:seed": "node scripts/create-catalog-data.js",
+    "users:create": "node scripts/create-test-users.js",
     "migration:generate": "sequelize-cli migration:generate --name",
     "seed:generate": "sequelize-cli seed:generate --name",
     "prisma:migrate": "prisma migrate dev",
