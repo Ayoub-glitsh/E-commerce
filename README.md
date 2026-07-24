@@ -376,7 +376,7 @@ Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de 
 <a href="https://github.com/Ayoub-glitsh">
 <img src="https://github.com/Ayoub-glitsh.png" width="100px;" alt="Ayoub Aguezar"/><br />
 <sub><b>Ayoub Aguezar</b></sub><br />
-<sub>Principal Software Engineer</sub>
+<sub>Principal & Lead Software Engineer</sub>
 </a>
 </td>
   
