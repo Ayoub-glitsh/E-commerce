@@ -376,7 +376,7 @@ Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de 
 <a href="https://github.com/Ayoub-glitsh">
 <img src="https://github.com/Ayoub-glitsh.png" width="100px;" alt="Ayoub Aguezar"/><br />
 <sub><b>Ayoub Aguezar</b></sub><br />
-<sub>Lead Developer</sub>
+<sub>Principal Software Engineer</sub>
 </a>
 </td>
   
@@ -384,7 +384,7 @@ Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de 
 <a href="https://github.com/oumayma728">
 <img src="https://github.com/oumayma728.png" width="100px;" alt="Oumayma"/><br />
 <sub><b>Oumayma</b></sub><br />
-<sub>Scrum Master</sub>
+<sub>Scrum Master & Tech Lead</sub>
 </a>
 </td> 
 
