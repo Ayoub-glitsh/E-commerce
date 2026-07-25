@@ -451,7 +451,7 @@ Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de 
 <a href="https://github.com/Elmahdi45">
 <img src="https://github.com/Elmahdi45.png" width="100px;" alt="Elmahdi45"/><br />
 <sub><b>Elmahdi45</b></sub><br />
-<sub>Developer</sub>
+<sub>Front-End Developer</sub>
 </a>
 </td>
 
@@ -459,7 +459,15 @@ Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de 
 <a href="https://github.com/AITHMAID-AYOUB">
 <img src="https://github.com/AITHMAID-AYOUB.png" width="100px;" alt="AITHMAID-AYOUB"/><br />
 <sub><b>AITHMAID-AYOUB</b></sub><br />
-<sub>Developer</sub>
+<sub>Full Stack Developer</sub>
+</a>
+</td>
+
+<td align="center">
+<a href="https://github.com/ABDELLATIF1936">
+<img src="https://github.com/ABDELLATIF1936.png" width="100px;" alt="ABDELLATIF HARAKAT"/><br />
+<sub><b>ABDELLATIF HARAKAT</b></sub><br />
+<sub>Full Stack Developer</sub>
 </a>
 </td>
 
