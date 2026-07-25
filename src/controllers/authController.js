@@ -33,7 +33,7 @@ class AuthController {
         });
       }
 
-      const { email, password, role = 'user' } = req.body;
+      const { email, password, role = 'client' } = req.body;
 
       // Vérifier si l'utilisateur existe déjà
       const existingUser = await User.findOne({ where: { email } });
@@ -354,8 +354,8 @@ AuthController.validateRegister = [
     .withMessage('Le mot de passe doit contenir au moins une minuscule, une majuscule et un chiffre'),
   body('role')
     .optional()
-    .isIn(['user', 'admin'])
-    .withMessage('Le rôle doit être "user" ou "admin"')
+    .isIn(['client', 'admin'])
+    .withMessage('Le rôle doit être "client" ou "admin"')
 ];
 
 AuthController.validateLogin = [
