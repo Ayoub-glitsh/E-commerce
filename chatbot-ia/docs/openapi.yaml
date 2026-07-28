@@ -1,0 +1,288 @@
+openapi: 3.0.3
+info:
+  title: Chatbot IA - API E-Commerce
+  description: |
+    API du module Chatbot IA pour la plateforme e-commerce.
+
+    **Caractéristiques :**
+    - Module stateless (historique renvoyé dans le body de chaque requête)
+    - Streaming SSE pour le chatbot
+    - Intégration Groq (Llama 3.3 70B)
+
+    **Règle absolue du CDC :** Ce contrat doit être publié avant toute implémentation.
+  version: 1.0.0
+  contact:
+    name: Équipe Chatbot IA
+
+servers:
+  - url: http://localhost:5000
+    description: Serveur de développement
+
+tags:
+  - name: Chat
+    description: Endpoints du chatbot conversationnel
+  - name: AI Utilities
+    description: Utilitaires IA pour le catalogue
+
+paths:
+  /chat/message:
+    post:
+      tags:
+        - Chat
+      summary: Envoyer un message au chatbot (streaming SSE)
+      description: |
+        Envoie un message utilisateur avec l'historique de conversation et reçoit une réponse en streaming via Server-Sent Events.
+
+        **Important :** Le module est stateless côté serveur. L'historique complet doit être renvoyé dans chaque requête.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatRequest"
+            example:
+              message: "Quels laptops avez-vous ?"
+              conversation_history: []
+      responses:
+        "200":
+          description: Réponse en streaming SSE
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: |
+                  Flux SSE avec des événements au format :
+                  - `data: {"delta": "texte..."}` pour chaque chunk de texte
+                  - `data: {"done": true}` quand la réponse est complète
+                  - `data: {"error": "message"}` en cas d'erreur
+              example: |
+                data: {"delta": "Bonjour"}
+
+                data: {"delta": " !"}
+
+                data: {"delta": " Nous"}
+
+                data: {"done": true}
+        "400":
+          description: Requête invalide
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Le champ 'message' est requis (string)."
+        "500":
+          description: Erreur serveur (rate limit Groq, etc.)
+          content:
+            text/event-stream:
+              schema:
+                type: string
+              example: |
+                data: {"error": "Le service est temporairement surchargé, réessaie dans quelques secondes."}
+
+  /ai/generate-description:
+    post:
+      tags:
+        - AI Utilities
+      summary: Générer une description produit
+      description: Génère automatiquement une description e-commerce professionnelle basée sur le nom, la catégorie et les tags du produit.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateDescriptionRequest"
+            example:
+              name: "Casque Gaming Pro RGB"
+              category: "audio"
+              tags: ["gaming", "rgb", "7.1 surround"]
+      responses:
+        "200":
+          description: Description générée avec succès
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenerateDescriptionResponse"
+              example:
+                description: "Plongez dans l'action avec le Casque Gaming Pro RGB. Son immersif 7.1 et éclairage RGB personnalisable pour une expérience gaming ultime."
+        "400":
+          description: Champs requis manquants
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Les champs 'name' et 'category' sont requis."
+        "500":
+          description: Erreur lors de la génération
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Impossible de générer la description."
+
+  /ai/summarize-reviews:
+    post:
+      tags:
+        - AI Utilities
+      summary: Résumer des avis clients
+      description: |
+        Analyse une liste d'avis clients et génère un résumé structuré avec les points positifs et négatifs.
+
+        Utile pour afficher un résumé concis sur les pages produit.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SummarizeReviewsRequest"
+            example:
+              reviews:
+                - "Super produit, livraison rapide !"
+                - "Qualité excellente mais un peu cher"
+                - "Je recommande, très satisfait"
+                - "Le son est top mais les oreillettes serrent un peu"
+      responses:
+        "200":
+          description: Résumé généré avec succès
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SummarizeReviewsResponse"
+              example:
+                summary:
+                  pros:
+                    - "Qualité excellente"
+                    - "Livraison rapide"
+                    - "Bon son"
+                  cons:
+                    - "Prix élevé"
+                    - "Oreillettes qui serrent"
+        "400":
+          description: Champ reviews invalide
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Le champ 'reviews' doit être un tableau non vide."
+        "500":
+          description: Erreur lors du résumé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Impossible de résumer les avis."
+
+components:
+  schemas:
+    ChatRequest:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          description: Message de l'utilisateur
+          example: "Quels laptops avez-vous ?"
+        conversation_history:
+          type: array
+          description: Historique de la conversation (stateless)
+          items:
+            $ref: "#/components/schemas/ChatMessage"
+          default: []
+          example:
+            - role: "user"
+              content: "Bonjour"
+            - role: "assistant"
+              content: "Bonjour ! Comment puis-je vous aider ?"
+
+    ChatMessage:
+      type: object
+      required:
+        - role
+        - content
+      properties:
+        role:
+          type: string
+          enum: [user, assistant]
+          description: Rôle du message
+          example: "user"
+        content:
+          type: string
+          description: Contenu du message
+          example: "Bonjour"
+
+    GenerateDescriptionRequest:
+      type: object
+      required:
+        - name
+        - category
+      properties:
+        name:
+          type: string
+          description: Nom du produit
+          example: "Casque Gaming Pro RGB"
+        category:
+          type: string
+          description: Catégorie du produit
+          example: "audio"
+        tags:
+          type: array
+          description: Tags/mots-clés du produit
+          items:
+            type: string
+          default: []
+          example: ["gaming", "rgb", "7.1 surround"]
+
+    GenerateDescriptionResponse:
+      type: object
+      properties:
+        description:
+          type: string
+          description: Description générée (2-3 phrases)
+          example: "Plongez dans l'action avec le Casque Gaming Pro RGB. Son immersif 7.1 et éclairage RGB personnalisable pour une expérience gaming ultime."
+
+    SummarizeReviewsRequest:
+      type: object
+      required:
+        - reviews
+      properties:
+        reviews:
+          type: array
+          description: Liste des avis clients à analyser
+          items:
+            type: string
+          minItems: 1
+          example:
+            - "Super produit, livraison rapide !"
+            - "Qualité excellente mais un peu cher"
+
+    SummarizeReviewsResponse:
+      type: object
+      properties:
+        summary:
+          type: object
+          properties:
+            pros:
+              type: array
+              description: Points positifs extraits des avis
+              items:
+                type: string
+              example: ["Qualité excellente", "Livraison rapide"]
+            cons:
+              type: array
+              description: Points négatifs extraits des avis
+              items:
+                type: string
+              example: ["Prix élevé"]
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Message d'erreur
+          example: "Le champ 'message' est requis (string)."

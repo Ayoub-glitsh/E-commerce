@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Démo — Widget Chatbot</title>
+  <link rel="stylesheet" href="widget.css" />
+  <style>
+    body { font-family: sans-serif; padding: 40px; background: #f9fafb; }
+  </style>
+</head>
+<body>
+  <h1>Page produit (démo)</h1>
+  <p>Le widget chatbot est intégrable sur toutes les pages produit de la plateforme — il apparaît en bas à droite.</p>
+
+  <!-- ===== WIDGET CHATBOT — à inclure sur toutes les pages produit ===== -->
+  <div id="chatbot-widget-root">
+    <button id="cw-toggle-btn" aria-label="Ouvrir le chat">💬</button>
+
+    <div id="cw-panel">
+      <div id="cw-header">
+        <span id="cw-header-title">Assistant</span>
+        <div id="cw-header-actions">
+          <button id="cw-reset-btn">Nouvelle conversation</button>
+          <button id="cw-minimize-btn" aria-label="Réduire">✕</button>
+        </div>
+      </div>
+
+      <div id="cw-messages"></div>
+
+      <div id="cw-typing">
+        <span class="cw-dot"></span><span class="cw-dot"></span><span class="cw-dot"></span>
+        en train d'écrire...
+      </div>
+      <div id="cw-error"></div>
+
+      <div id="cw-input-row">
+        <input id="cw-input" type="text" placeholder="Pose ta question..." />
+        <button id="cw-send-btn" disabled>Envoyer</button>
+      </div>
+    </div>
+  </div>
+  <!-- ===== FIN WIDGET CHATBOT ===== -->
+
+  <script src="widget.js"></script>
+</body>
+</html>
