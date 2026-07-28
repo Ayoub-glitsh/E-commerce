@@ -6,6 +6,7 @@ const cors = require('cors');
 const authRoutes = require('./routes/auth');
 const catalogRoutes = require('./routes/catalog');
 const adminRoutes = require('./routes/admin');
+const reviewRoutes = require('./routes/reviews');
 // const cartRoutes = require('./controllers/cartController');
 
 // Initialisation de l'application Express
@@ -48,6 +49,9 @@ app.use('/api/auth', authRoutes);
 
 // Routes du catalogue (publiques)
 app.use('/api', catalogRoutes);
+
+// Routes des avis (publiques et privées)
+app.use('/api', reviewRoutes);
 
 // Routes d'administration (admin uniquement)
 app.use('/api/admin', adminRoutes);
@@ -129,6 +133,8 @@ app.use((req, res) => {
       'GET /api/auth/verify',
       'GET /api/products',
       'GET /api/products/:id',
+      'GET /api/products/:id/reviews',
+      'POST /api/products/:id/reviews (AUTH)',
       'GET /api/categories',
       'GET /api/admin/products (ADMIN)',
       'POST /api/admin/products (ADMIN)',
