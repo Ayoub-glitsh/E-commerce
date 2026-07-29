@@ -7,7 +7,7 @@ const authRoutes = require('./routes/auth');
 const catalogRoutes = require('./routes/catalog');
 const adminRoutes = require('./routes/admin');
 const reviewRoutes = require('./routes/reviews');
-// const cartRoutes = require('./controllers/cartController');
+const cartRoutes = require('./routes/cart');
 
 // Initialisation de l'application Express
 const app = express();
@@ -56,8 +56,8 @@ app.use('/api', reviewRoutes);
 // Routes d'administration (admin uniquement)
 app.use('/api/admin', adminRoutes);
 
-// Routes du panier (temporairement désactivées)
-// app.use('/api/cart', cartRoutes);
+// Routes du panier (authentification requise)
+app.use('/api/cart', cartRoutes);
 
 // Route de test de la base de données
 app.get('/api/test-db', async (req, res) => {
