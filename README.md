@@ -476,7 +476,7 @@ Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de 
 <td align="center">
 <a href="https://github.com/ZakArfaoui">
 <img src="https://github.com/ZakArfaoui.png" width="100px;" alt="Zakaria Arfaoui"/><br />
-<sub><b>ABDELLATIF HARAKAT</b></sub><br />
+<sub><b>Zakaria Arfaoui</b></sub><br />
 <sub>Data Science and AI Engineer</sub>
 </a>
 </td>
