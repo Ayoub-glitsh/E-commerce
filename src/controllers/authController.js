@@ -1,6 +1,7 @@
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
+const { v4: uuidv4 } = require('uuid');
 const { User, RefreshToken } = require('../../models');
 
 /**
@@ -33,7 +34,7 @@ class AuthController {
         });
       }
 
-      const { email, password, role = 'client' } = req.body;
+      const { email, password, firstName, lastName, role = 'client' } = req.body;
 
       // Vérifier si l'utilisateur existe déjà
       const existingUser = await User.findOne({ where: { email } });
@@ -48,10 +49,12 @@ class AuthController {
       const saltRounds = 12;
       const passwordHash = await bcrypt.hash(password, saltRounds);
 
-      // Créer l'utilisateur
+      // Créer l'utilisateur avec UUID généré
       const user = await User.create({
+        id: uuidv4(), // Générer UUID pour l'id
         email,
-        password: passwordHash, // Note: sera mappé vers passwordHash
+        password: passwordHash, 
+        name: `${firstName} ${lastName}`.trim(), // Combiner firstName et lastName
         role
       });
 
