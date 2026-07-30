@@ -48,5 +48,34 @@ module.exports = (sequelize) => {
     });
   };
 
+  /**
+   * Méthode statique pour trouver le panier d'un utilisateur
+   * @param {string} userId - ID de l'utilisateur
+   * @returns {Promise<Cart|null>} - Panier avec items ou null
+   */
+  Cart.findByUserId = async function(userId) {
+    return await Cart.findOne({
+      where: { userId: userId },
+      include: [{
+        model: sequelize.models.CartItem,
+        as: 'items',
+        order: [['created_at', 'ASC']]
+      }]
+    });
+  };
+
+  /**
+   * Méthode d'instance pour vider le panier
+   * @returns {Promise<void>}
+   */
+  Cart.prototype.clear = async function() {
+    // Supprimer tous les items du panier
+    await sequelize.models.CartItem.destroy({
+      where: { cartId: this.id }
+    });
+    
+    console.log(`🗑️ Panier ${this.id} vidé (clear() appelé)`);
+  };
+
   return Cart;
 };

@@ -16,7 +16,7 @@ const findByUserId = async (userId) => {
       include: [{
         model: Product,
         as: 'product',
-        attributes: ['id', 'name', 'price', 'imageUrl']
+        attributes: ['id', 'name', 'price', 'images']
       }]
     }],
     order: [[{ model: CartItem, as: 'items' }, 'created_at', 'ASC']]
