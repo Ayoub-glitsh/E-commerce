@@ -1,4 +1,5 @@
 const { Cart, CartItem, Product } = require('../../models');
+const catalogService = require('../services/catalogService');
 
 /**
  * Contrôleur pour la gestion du panier
@@ -81,16 +82,37 @@ const addItemToCart = async (req, res) => {
       });
     }
 
-    // Vérifier que le produit existe
-    const product = await Product.findByPk(product_id);
-    if (!product) {
-      return res.status(404).json({
+    // ✅ NOUVELLE FONCTIONNALITÉ : Vérification du stock via API Catalogue
+    console.log(`Vérification du stock pour le produit ${product_id}, quantité: ${quantity}`);
+    
+    let stockCheck;
+    try {
+      stockCheck = await catalogService.checkStockAvailability(product_id, quantity);
+    } catch (error) {
+      return res.status(400).json({
         success: false,
-        message: "Produit non trouvé"
+        message: `Erreur lors de la vérification du produit: ${error.message}`
       });
     }
 
-    const price = parseFloat(product.price);
+    // Vérification du stock disponible
+    if (!stockCheck.available) {
+      return res.status(400).json({
+        success: false,
+        message: `Stock insuffisant. Demandé: ${stockCheck.requestedQuantity}, Disponible: ${stockCheck.availableStock}`,
+        data: {
+          productId: product_id,
+          productName: stockCheck.product.name,
+          requestedQuantity: stockCheck.requestedQuantity,
+          availableStock: stockCheck.availableStock,
+          shortfall: stockCheck.shortfall
+        }
+      });
+    }
+
+    // ✅ NOUVELLE FONCTIONNALITÉ : Récupération du prix actuel depuis le catalogue
+    const currentPrice = stockCheck.product.price;
+    console.log(`Prix actuel du produit ${product_id}: ${currentPrice}€`);
 
     let cart = await findByUserId(userId);
 
@@ -110,17 +132,39 @@ const addItemToCart = async (req, res) => {
     });
 
     if (existingItem) {
-      // Produit existe déjà : incrémenter la quantité
+      // Produit existe déjà : vérifier le stock pour la quantité totale
+      const totalQuantity = existingItem.quantity + quantity;
+      
+      const totalStockCheck = await catalogService.checkStockAvailability(product_id, totalQuantity);
+      
+      if (!totalStockCheck.available) {
+        return res.status(400).json({
+          success: false,
+          message: `Stock insuffisant pour la quantité totale. Total demandé: ${totalStockCheck.requestedQuantity}, Disponible: ${totalStockCheck.availableStock}`,
+          data: {
+            productId: product_id,
+            productName: totalStockCheck.product.name,
+            currentInCart: existingItem.quantity,
+            requestedToAdd: quantity,
+            totalRequested: totalStockCheck.requestedQuantity,
+            availableStock: totalStockCheck.availableStock,
+            shortfall: totalStockCheck.shortfall
+          }
+        });
+      }
+
+      // ✅ Mise à jour avec le prix actuel du catalogue
       await existingItem.update({
-        quantity: existingItem.quantity + quantity
+        quantity: totalQuantity,
+        price: currentPrice // Prix mis à jour depuis le catalogue
       });
     } else {
-      // Produit n'existe pas : l'ajouter
+      // Produit n'existe pas : l'ajouter avec le prix actuel
       await CartItem.create({
         cartId: cart.id,
         productId: product_id,
         quantity: quantity,
-        price: price
+        price: currentPrice // ✅ Prix depuis l'API catalogue
       });
     }
 
@@ -129,11 +173,18 @@ const addItemToCart = async (req, res) => {
 
     res.status(200).json({
       success: true,
+      message: `Produit ajouté au panier avec succès`,
       data: {
         userId: updatedCart.userId,
         items: updatedCart.items,
         createdAt: updatedCart.created_at,
-        updatedAt: updatedCart.updated_at
+        updatedAt: updatedCart.updated_at,
+        stockInfo: {
+          productName: stockCheck.product.name,
+          addedQuantity: quantity,
+          currentPrice: currentPrice,
+          remainingStock: stockCheck.availableStock - quantity
+        }
       }
     });
 
@@ -193,19 +244,63 @@ const updateItemQuantity = async (req, res) => {
       });
     }
 
-    // Mettre à jour la quantité
-    await existingItem.update({ quantity: quantity });
+    // ✅ NOUVELLE FONCTIONNALITÉ : Vérification du stock pour la nouvelle quantité
+    console.log(`Vérification du stock pour mise à jour - Produit: ${product_id}, Nouvelle quantité: ${quantity}`);
+    
+    let stockCheck;
+    try {
+      stockCheck = await catalogService.checkStockAvailability(product_id, quantity);
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: `Erreur lors de la vérification du produit: ${error.message}`
+      });
+    }
+
+    // Vérification du stock disponible
+    if (!stockCheck.available) {
+      return res.status(400).json({
+        success: false,
+        message: `Stock insuffisant pour la quantité demandée. Demandé: ${stockCheck.requestedQuantity}, Disponible: ${stockCheck.availableStock}`,
+        data: {
+          productId: product_id,
+          productName: stockCheck.product.name,
+          currentQuantity: existingItem.quantity,
+          requestedQuantity: stockCheck.requestedQuantity,
+          availableStock: stockCheck.availableStock,
+          shortfall: stockCheck.shortfall
+        }
+      });
+    }
+
+    // ✅ NOUVELLE FONCTIONNALITÉ : Mise à jour avec le prix actuel du catalogue
+    const currentPrice = stockCheck.product.price;
+    console.log(`Mise à jour prix - Ancien: ${existingItem.price}€, Nouveau: ${currentPrice}€`);
+
+    // Mettre à jour la quantité et le prix
+    await existingItem.update({ 
+      quantity: quantity,
+      price: currentPrice // ✅ Prix mis à jour depuis le catalogue
+    });
 
     // Récupérer le panier mis à jour
     const updatedCart = await findByUserId(userId);
 
     res.status(200).json({
       success: true,
+      message: `Quantité mise à jour avec succès`,
       data: {
         userId: updatedCart.userId,
         items: updatedCart.items,
         createdAt: updatedCart.created_at,
-        updatedAt: updatedCart.updated_at
+        updatedAt: updatedCart.updated_at,
+        updateInfo: {
+          productName: stockCheck.product.name,
+          oldQuantity: existingItem.quantity,
+          newQuantity: quantity,
+          currentPrice: currentPrice,
+          remainingStock: stockCheck.availableStock - quantity
+        }
       }
     });
 
