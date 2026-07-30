@@ -10,3 +10,8 @@ node_modules
 # Ignore all .md files except README.md
 *.md
 !README.md
+
+# Specific documentation files to ignore
+REVIEWS_SYSTEM_README.md
+PULL_REQUEST_INFO.md
+POST_ORDERS_IMPLEMENTATION_SUMMARY.md
