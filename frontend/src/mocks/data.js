@@ -273,4 +273,46 @@ export const products = [
         ]
     },
 ];
+export const orders = [
+    {
+        id: "CMD-2026-8942",
+        date: "15 Juillet 2026",
+        status: "Livré",
+        total: 299.99,
+        address: "123 Rue de la Paix, 75000 Paris, France",
+        items: [
+            { id: 1, name: "MacBook Pro M4", image: "https://picsum.photos/400/400?random=1", category: "Électronique", price: 289.99, quantity: 1 }
+        ]
+    },
+    {
+        id: "CMD-2026-7731",
+        date: "02 Juin 2026",
+        status: "En transit",
+        total: 105.00,
+        address: "45 Avenue des Champs-Élysées, 75008 Paris, France",
+        items: [
+            { id: 3, name: "Casque Audio Pro", image: "https://picsum.photos/400/400?random=101", category: "Maison", price: 70.00, quantity: 1 },
+            { id: 4, name: "Souris Ergonomique", image: "https://picsum.photos/400/400?random=17", category: "Beauté", price: 25.00, quantity: 1 }
+        ]
+    },
+    {
+        id: "CMD-2026-5432",
+        date: "10 Janvier 2026",
+        status: "Annulé",
+        total: 198.00,
+        address: "10 Boulevard Haussmann, 75009 Paris, France",
+        items: [
+            { id: 5, name: "Clavier Mécanique", image: "https://picsum.photos/400/400?random=70", category: "Beauté", price: 188.00, quantity: 1 }
+        ]
+    }
+];
 
+
+export let users = [
+    {
+        id: 1,
+        name: "Mehdi",
+        email: "mehdi@test.com",
+        password: "Test1234!"
+    }
+];
