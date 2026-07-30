@@ -2,14 +2,15 @@ const { Order, Cart, CartItem, User } = require('../../models');
 const { v4: uuidv4 } = require('uuid');
 
 /**
- * Contrôleur de gestion des commandes avec endpoint POST /orders
- * FonctionnalitéHaute#1778 + FonctionnalitéHaute#1777 (machine à états)
+ * Contrôleur de gestion des commandes
+ * FonctionnalitéHaute#1778 (POST /orders) + FonctionnalitéHaute#1777 (machine à états) + FonctionnalitéHaute#1779 (historique)
  * 
  * Fonctionnalités:
  * - Création de commandes depuis le panier (FonctionnalitéHaute#1778)
- * - Gestion machine à états (pending -> confirmed -> shipped -> delivered)
+ * - Gestion machine à états (pending -> confirmed -> shipped -> delivered) (FonctionnalitéHaute#1777)
+ * - Historique et consultation des commandes (FonctionnalitéHaute#1779)
  * - Validation des transitions de statut
- * - Consultation et historique des commandes
+ * - Sécurité : utilisateurs n'accèdent qu'à leurs propres commandes
  */
 
 class OrderController {
@@ -187,7 +188,8 @@ class OrderController {
   }
 
   /**
-   * GET /api/orders - Lister les commandes de l'utilisateur
+   * GET /api/orders - Lister les commandes de l'utilisateur (FonctionnalitéHaute#1779)
+   * Sous-tâche 1: Implémenter GET /orders : requête find({ userId }) avec tri par date décroissante
    * 
    * @param {Object} req - Requête Express  
    * @param {Object} res - Réponse Express
@@ -195,50 +197,86 @@ class OrderController {
   static async getUserOrders(req, res) {
     try {
       const userId = req.user.id;
-      const { status, limit = 50, offset = 0 } = req.query;
+      const { status, limit = 50, offset = 0, page = 1 } = req.query;
 
-      console.log(`📋 Récupération commandes utilisateur ${userId}`);
+      console.log(`📋 FonctionnalitéHaute#1779 - Récupération historique commandes utilisateur ${userId}`);
 
-      // Construire les conditions de recherche
+      // Sous-tâche 1: Construire les conditions de recherche find({ userId })
       const whereConditions = { userId: userId };
       if (status && Object.values(Order.STATUS).includes(status)) {
         whereConditions.status = status;
       }
 
-      // Récupérer les commandes
-      const orders = await Order.findAll({
+      // Calcul de pagination
+      const limitInt = Math.min(parseInt(limit) || 50, 100); // Limite max de 100
+      const pageInt = Math.max(parseInt(page) || 1, 1); // Page min de 1
+      const offsetCalculated = offset ? parseInt(offset) : (pageInt - 1) * limitInt;
+
+      // Sous-tâche 1: Requête avec tri par date décroissante
+      const { count, rows: orders } = await Order.findAndCountAll({
         where: whereConditions,
-        order: [['created_at', 'DESC']],
-        limit: parseInt(limit),
-        offset: parseInt(offset)
+        order: [['created_at', 'DESC']], // Tri par date décroissante selon spécification
+        limit: limitInt,
+        offset: offsetCalculated,
+        attributes: [
+          'id', 'orderId', 'userId', 'status', 'totalAmount', 'items',
+          'shippingAddress', 'billingAddress', 'paymentMethod', 
+          'trackingNumber', 'notes', 'created_at', 'updated_at'
+        ]
       });
 
-      // Formatter les résultats
+      console.log(`📋 ${orders.length} commandes trouvées sur ${count} total`);
+
+      // Formatter les résultats avec tous les détails selon spécification
       const formattedOrders = orders.map(order => ({
         orderId: order.orderId,
         id: order.id,
         status: order.status,
         totalAmount: parseFloat(order.totalAmount),
         itemsCount: order.items?.length || 0,
-        items: order.items,
+        // Sous-tâche 3: Retourner les détails complets
+        items: order.items?.map(item => ({
+          productId: item.productId,
+          name: item.name,
+          quantity: item.quantity,
+          price: parseFloat(item.price),
+          total: parseFloat(item.total || (item.price * item.quantity))
+        })) || [],
+        shippingAddress: order.shippingAddress,
+        billingAddress: order.billingAddress,
+        paymentMethod: order.paymentMethod,
+        trackingNumber: order.trackingNumber,
+        notes: order.notes,
+        // Informations sur les transitions et état
         availableTransitions: order.getAvailableTransitions(),
         isModifiable: order.isModifiable(),
         isCompleted: order.isCompleted(),
-        trackingNumber: order.trackingNumber,
-        paymentMethod: order.paymentMethod,
+        // Sous-tâche 3: Dates complètes
         createdAt: order.created_at,
         updatedAt: order.updated_at
       }));
 
+      // Pagination détaillée
+      const hasNextPage = (offsetCalculated + limitInt) < count;
+      const hasPrevPage = offsetCalculated > 0;
+      const totalPages = Math.ceil(count / limitInt);
+
       res.status(200).json({
         success: true,
+        message: `${count} commandes trouvées pour l'utilisateur`,
         data: {
           orders: formattedOrders,
           pagination: {
-            total: formattedOrders.length,
-            limit: parseInt(limit),
-            offset: parseInt(offset),
-            hasMore: formattedOrders.length === parseInt(limit)
+            total: count,
+            count: formattedOrders.length,
+            page: pageInt,
+            totalPages: totalPages,
+            limit: limitInt,
+            offset: offsetCalculated,
+            hasNextPage: hasNextPage,
+            hasPrevPage: hasPrevPage,
+            nextPage: hasNextPage ? pageInt + 1 : null,
+            prevPage: hasPrevPage ? pageInt - 1 : null
           }
         }
       });
@@ -253,7 +291,9 @@ class OrderController {
   }
 
   /**
-   * GET /api/orders/:orderId - Récupérer une commande spécifique
+   * GET /api/orders/:orderId - Récupérer une commande spécifique (FonctionnalitéHaute#1779)
+   * Sous-tâche 2: Implémenter GET /orders/:id : récupérer l'order par id et vérifier userId === user.id du token
+   * Sous-tâche 3: Retourner les détails complets (items avec product_id/quantity/price, total, status, dates)
    * 
    * @param {Object} req - Requête Express
    * @param {Object} res - Réponse Express
@@ -261,50 +301,90 @@ class OrderController {
   static async getOrderById(req, res) {
     try {
       const { orderId } = req.params;
-      const userId = req.user.id;
+      const userId = req.user.id; // user.id du token JWT
 
-      console.log(`📦 Récupération commande ${orderId} pour utilisateur ${userId}`);
+      console.log(`📦 FonctionnalitéHaute#1779 - Récupération commande ${orderId} pour utilisateur ${userId}`);
 
+      // Sous-tâche 2: Récupérer l'order par id et vérifier userId === user.id du token
       const order = await Order.findOne({
         where: { 
           orderId: orderId,
-          userId: userId
+          userId: userId // Vérification de sécurité: l'utilisateur n'accède qu'à ses propres commandes
         },
         include: [{
           model: User,
           as: 'user',
           attributes: ['id', 'email', 'name']
-        }]
+        }],
+        attributes: [
+          'id', 'orderId', 'userId', 'status', 'totalAmount', 'items',
+          'shippingAddress', 'billingAddress', 'paymentMethod', 
+          'trackingNumber', 'notes', 'created_at', 'updated_at'
+        ]
       });
 
       if (!order) {
+        console.log(`❌ Commande ${orderId} non trouvée ou n'appartient pas à l'utilisateur ${userId}`);
         return res.status(404).json({
           success: false,
-          message: 'Commande non trouvée'
+          message: 'Commande non trouvée ou accès non autorisé'
         });
       }
 
-      // Réponse détaillée
+      console.log(`✅ Commande ${orderId} trouvée avec ${order.items?.length || 0} items`);
+
+      // Sous-tâche 3: Retourner les détails complets
+      const detailedResponse = {
+        orderId: order.orderId,
+        id: order.id,
+        status: order.status,
+        totalAmount: parseFloat(order.totalAmount),
+        
+        // Items avec product_id/quantity/price selon spécification
+        items: order.items?.map(item => ({
+          productId: item.productId, // product_id selon spécification
+          name: item.name,
+          quantity: item.quantity,
+          price: parseFloat(item.price),
+          total: parseFloat(item.total || (item.price * item.quantity))
+        })) || [],
+        
+        // Détails d'adresse et paiement complets
+        shippingAddress: order.shippingAddress,
+        billingAddress: order.billingAddress,
+        paymentMethod: order.paymentMethod,
+        trackingNumber: order.trackingNumber,
+        notes: order.notes,
+        
+        // Informations sur les transitions et état
+        availableTransitions: order.getAvailableTransitions(),
+        isModifiable: order.isModifiable(),
+        isCompleted: order.isCompleted(),
+        
+        // Informations utilisateur (sans données sensibles)
+        user: order.user ? {
+          id: order.user.id,
+          email: order.user.email,
+          name: order.user.name
+        } : null,
+        
+        // Dates complètes selon spécification
+        createdAt: order.created_at,
+        updatedAt: order.updated_at
+      };
+
+      // Log des détails pour debugging
+      console.log(`📦 Détails commande ${orderId}:`);
+      console.log(`   - Status: ${detailedResponse.status}`);
+      console.log(`   - Total: ${detailedResponse.totalAmount}€`);
+      console.log(`   - Items: ${detailedResponse.items.length}`);
+      console.log(`   - Paiement: ${detailedResponse.paymentMethod || 'Non spécifié'}`);
+      console.log(`   - Créée le: ${detailedResponse.createdAt}`);
+
       res.status(200).json({
         success: true,
-        data: {
-          orderId: order.orderId,
-          id: order.id,
-          status: order.status,
-          totalAmount: parseFloat(order.totalAmount),
-          items: order.items,
-          shippingAddress: order.shippingAddress,
-          billingAddress: order.billingAddress,
-          paymentMethod: order.paymentMethod,
-          trackingNumber: order.trackingNumber,
-          notes: order.notes,
-          availableTransitions: order.getAvailableTransitions(),
-          isModifiable: order.isModifiable(),
-          isCompleted: order.isCompleted(),
-          user: order.user,
-          createdAt: order.created_at,
-          updatedAt: order.updated_at
-        }
+        message: 'Commande récupérée avec succès',
+        data: detailedResponse
       });
 
     } catch (error) {
