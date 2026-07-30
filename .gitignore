@@ -6,3 +6,7 @@ node_modules
 
 # Ignore Kiro configuration and specs
 .kiro/
+
+# Ignore all .md files except README.md
+*.md
+!README.md

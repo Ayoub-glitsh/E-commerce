@@ -2,11 +2,11 @@ const { Order, Cart, CartItem, User } = require('../../models');
 const { v4: uuidv4 } = require('uuid');
 
 /**
- * Contrôleur de gestion des commandes avec machine à états
- * FonctionnalitéHaute#1777
+ * Contrôleur de gestion des commandes avec endpoint POST /orders
+ * FonctionnalitéHaute#1778 + FonctionnalitéHaute#1777 (machine à états)
  * 
  * Fonctionnalités:
- * - Création de commandes depuis le panier
+ * - Création de commandes depuis le panier (FonctionnalitéHaute#1778)
  * - Gestion machine à états (pending -> confirmed -> shipped -> delivered)
  * - Validation des transitions de statut
  * - Consultation et historique des commandes
@@ -16,6 +16,7 @@ class OrderController {
 
   /**
    * POST /api/orders - Créer une commande depuis le panier
+   * FonctionnalitéHaute#1778
    * 
    * @param {Object} req - Requête Express
    * @param {Object} res - Réponse Express
@@ -23,100 +24,71 @@ class OrderController {
   static async createOrder(req, res) {
     try {
       const userId = req.user.id;
-      const { shippingAddress, billingAddress, paymentMethod, notes, items } = req.body;
+      const { shippingAddress, billingAddress, paymentMethod, notes } = req.body;
 
       console.log(`📦 Création de commande pour l'utilisateur ${userId}`);
 
-      let orderItems = [];
-
-      // Si des items sont fournis directement dans la requête (pour les tests)
-      if (items && Array.isArray(items) && items.length > 0) {
-        orderItems = items.map(item => ({
-          productId: item.productId,
-          name: item.name || 'Produit',
-          price: parseFloat(item.price) || 0,
-          quantity: item.quantity || 1,
-          total: (parseFloat(item.price) || 0) * (item.quantity || 1)
-        }));
-        
-        console.log(`📦 Utilisation des items fournis: ${orderItems.length} items`);
-      } else {
-        // Sinon, récupérer le panier de l'utilisateur avec ses items
-        const cart = await Cart.findOne({
-          where: { userId: userId },
-          include: [{
-            model: CartItem,
-            as: 'items'
-          }]
+      // Sous-tâche 1: Récupérer le panier de l'utilisateur via findByUserId
+      const cart = await Cart.findByUserId(userId);
+      
+      if (!cart) {
+        return res.status(400).json({
+          success: false,
+          message: 'Aucun panier trouvé pour cet utilisateur'
         });
-
-        if (!cart || !cart.items || cart.items.length === 0) {
-          return res.status(400).json({
-            success: false,
-            message: 'Aucun item dans le panier pour créer une commande. Ajoutez des items au panier ou fournissez le paramètre "items" dans la requête.'
-          });
-        }
-
-        // Copier les items du panier (snapshot au moment de la commande)
-        orderItems = cart.items.map(item => ({
-          productId: item.productId,
-          name: item.name || 'Produit',
-          price: parseFloat(item.price) || 0,
-          quantity: item.quantity,
-          total: (parseFloat(item.price) || 0) * item.quantity
-        }));
-
-        console.log(`📦 Récupération depuis le panier: ${orderItems.length} items`);
-
-        // Vider le panier après création de commande
-        await CartItem.destroy({
-          where: { cartId: cart.id }
-        });
-
-        console.log(`🗑️ Panier vidé après création de la commande`);
       }
 
-      // Calculer le montant total
+      // Sous-tâche 2: Vérifier que panier.items.length > 0
+      if (!cart.items || cart.items.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Le panier est vide. Ajoutez des produits avant de passer commande.'
+        });
+      }
+
+      console.log(`🛒 Panier trouvé avec ${cart.items.length} items`);
+
+      // Copier les items du panier dans la commande
+      const orderItems = cart.items.map(item => ({
+        productId: item.productId,
+        name: item.name || 'Produit',
+        price: parseFloat(item.price) || 0,
+        quantity: item.quantity || 1,
+        total: (parseFloat(item.price) || 0) * (item.quantity || 1)
+      }));
+
+      // Calculer le totalAmount
       const totalAmount = orderItems.reduce((sum, item) => sum + item.total, 0);
 
-      // Créer la commande
+      console.log(`💰 Total calculé: ${totalAmount}€`);
+
+      // Créer la commande avec status=pending
       const order = await Order.create({
         id: uuidv4(),
-        orderId: `ORD-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`, // Générer orderId manuellement
+        orderId: `ORD-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
         userId: userId,
         items: orderItems,
         totalAmount: totalAmount,
-        status: Order.STATUS.PENDING,
+        status: 'pending', // Status initial selon spécification FonctionnalitéHaute#1778
         shippingAddress: shippingAddress || null,
         billingAddress: billingAddress || null,
         paymentMethod: paymentMethod || null,
         notes: notes || null
       });
 
-      console.log(`✅ Commande ${order.orderId} créée avec ${orderItems.length} items (Total: ${totalAmount}€)`);
+      console.log(`✅ Commande créée: ${order.orderId} (Status: ${order.status})`);
 
-      // Optionnel: Vider le panier après création de commande seulement si on a utilisé le panier
-      if (!items || items.length === 0) {
-        await CartItem.destroy({
-          where: { cartId: cart.id }
-        });
+      // Sous-tâche 3: Appeler cart.clear() pour vider le panier
+      await cart.clear();
 
-        console.log(`🗑️ Panier vidé après création de la commande`);
-      }
-
-      // Réponse avec détails de la commande
+      // Retourner la réponse selon la spécification: { orderId, total, status: 'pending' }
       res.status(201).json({
         success: true,
         message: 'Commande créée avec succès',
         data: {
           orderId: order.orderId,
-          id: order.id,
-          status: order.status,
-          totalAmount: parseFloat(order.totalAmount),
-          itemsCount: orderItems.length,
-          items: orderItems,
-          availableTransitions: order.getAvailableTransitions(),
-          createdAt: order.created_at
+          total: parseFloat(totalAmount),
+          status: 'pending'
         }
       });
 
