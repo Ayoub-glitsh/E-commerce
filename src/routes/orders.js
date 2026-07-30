@@ -5,11 +5,12 @@ const { verifyToken } = require('../middleware/auth');
 const router = express.Router();
 
 /**
- * Routes de gestion des commandes avec machine à états
- * FonctionnalitéHaute#1777
+ * Routes de gestion des commandes avec historique
+ * FonctionnalitéHaute#1777 (machine à états) + FonctionnalitéHaute#1778 (POST /orders) + FonctionnalitéHaute#1779 (historique)
  * 
  * Base URL: /api/orders
  * Toutes les routes requièrent une authentification JWT
+ * Sécurité : Les utilisateurs n'accèdent qu'à leurs propres commandes
  */
 
 /**
@@ -50,27 +51,29 @@ router.post('/', verifyToken, OrderController.createOrder);
 
 /**
  * @route   GET /api/orders
- * @desc    Lister les commandes de l'utilisateur connecté
+ * @desc    Historique des commandes utilisateur (FonctionnalitéHaute#1779)
  * @access  Private (JWT required)
  * @headers Authorization: Bearer <accessToken>
  * @query   {
  *            status?: "pending"|"confirmed"|"shipped"|"delivered",
  *            limit?: number (default: 50),
- *            offset?: number (default: 0)
+ *            offset?: number (default: 0),
+ *            page?: number (default: 1)
  *          }
  * @returns {
  *            success: boolean,
+ *            message: string,
  *            data: {
  *              orders: array,
  *              pagination: object
  *            }
  *          }
  * 
- * Comportement:
- * - Filtre par statut si spécifié
- * - Trie par date de création (plus récentes en premier)
- * - Pagination avec limit/offset
- * - Inclut les transitions disponibles pour chaque commande
+ * Spécification FonctionnalitéHaute#1779:
+ * - Sous-tâche 1: find({ userId }) avec tri par date décroissante
+ * - Sous-tâche 3: Détails complets (items avec product_id/quantity/price, total, status, dates)
+ * - Pagination optionnelle avec limit/offset ou page
+ * - Sécurité: Utilisateur n'accède qu'à ses propres commandes
  */
 router.get('/', verifyToken, OrderController.getUserOrders);
 
@@ -94,18 +97,19 @@ router.get('/statuses', verifyToken, OrderController.getAvailableStatuses);
 
 /**
  * @route   GET /api/orders/:orderId
- * @desc    Récupérer une commande spécifique par son orderId
+ * @desc    Détails d'une commande spécifique (FonctionnalitéHaute#1779)
  * @access  Private (JWT required)
  * @headers Authorization: Bearer <accessToken>
  * @params  { orderId: string } (ex: ORD-ABC123-DEF456)
  * @returns {
  *            success: boolean,
+ *            message: string,
  *            data: {
  *              orderId: string,
  *              id: string,
  *              status: string,
  *              totalAmount: number,
- *              items: array,
+ *              items: array with product_id/quantity/price,
  *              shippingAddress: object,
  *              billingAddress: object,
  *              paymentMethod: string,
@@ -120,10 +124,11 @@ router.get('/statuses', verifyToken, OrderController.getAvailableStatuses);
  *            }
  *          }
  * 
- * Comportement:
- * - Vérifie que la commande appartient à l'utilisateur connecté
- * - Inclut tous les détails de la commande
- * - Retourne les transitions disponibles
+ * Spécification FonctionnalitéHaute#1779:
+ * - Sous-tâche 2: Récupérer order par id et vérifier userId === user.id du token
+ * - Sous-tâche 3: Détails complets (items avec product_id/quantity/price, total, status, dates)
+ * - Sécurité: Vérifie que la commande appartient à l'utilisateur connecté
+ * - Retourne HTTP 404 si commande non trouvée ou n'appartient pas à l'utilisateur
  */
 router.get('/:orderId', verifyToken, OrderController.getOrderById);
 
