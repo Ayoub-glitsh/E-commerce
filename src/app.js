@@ -8,6 +8,7 @@ const catalogRoutes = require('./routes/catalog');
 const adminRoutes = require('./routes/admin');
 const reviewRoutes = require('./routes/reviews');
 const cartRoutes = require('./routes/cart');
+const wishlistRoutes = require('./routes/wishlist');
 
 // Initialisation de l'application Express
 const app = express();
@@ -58,6 +59,9 @@ app.use('/api/admin', adminRoutes);
 
 // Routes du panier (authentification requise)
 app.use('/api/cart', cartRoutes);
+
+// Routes de la wishlist (authentification requise)
+app.use('/api/wishlist', wishlistRoutes);
 
 // Route de test de la base de données
 app.get('/api/test-db', async (req, res) => {
@@ -144,7 +148,12 @@ app.use((req, res) => {
       'POST /api/cart/add',
       'PUT /api/cart/update',
       'DELETE /api/cart/remove',
-      'DELETE /api/cart/clear'
+      'DELETE /api/cart/clear',
+      'GET /api/wishlist',
+      'POST /api/wishlist',
+      'DELETE /api/wishlist/:productId',
+      'DELETE /api/wishlist',
+      'GET /api/wishlist/check/:productId'
     ]
   });
 });
