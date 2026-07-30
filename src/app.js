@@ -9,6 +9,7 @@ const adminRoutes = require('./routes/admin');
 const reviewRoutes = require('./routes/reviews');
 const cartRoutes = require('./routes/cart');
 const wishlistRoutes = require('./routes/wishlist');
+const orderRoutes = require('./routes/orders');
 
 // Initialisation de l'application Express
 const app = express();
@@ -62,6 +63,9 @@ app.use('/api/cart', cartRoutes);
 
 // Routes de la wishlist (authentification requise)
 app.use('/api/wishlist', wishlistRoutes);
+
+// Routes des commandes (authentification requise)
+app.use('/api/orders', orderRoutes);
 
 // Route de test de la base de données
 app.get('/api/test-db', async (req, res) => {
