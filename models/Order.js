@@ -15,15 +15,17 @@ module.exports = (sequelize) => {
     PENDING: 'pending',
     CONFIRMED: 'confirmed', 
     SHIPPED: 'shipped',
-    DELIVERED: 'delivered'
+    DELIVERED: 'delivered',
+    CANCELED: 'canceled' // FonctionnalitéMoyenne#1782
   };
 
   // Mapping des transitions valides
   const VALID_TRANSITIONS = {
-    [ORDER_STATUS.PENDING]: [ORDER_STATUS.CONFIRMED],
+    [ORDER_STATUS.PENDING]: [ORDER_STATUS.CONFIRMED, ORDER_STATUS.CANCELED], // FonctionnalitéMoyenne#1782: pending peut être annulé
     [ORDER_STATUS.CONFIRMED]: [ORDER_STATUS.SHIPPED],
     [ORDER_STATUS.SHIPPED]: [ORDER_STATUS.DELIVERED],
-    [ORDER_STATUS.DELIVERED]: [] // État final, aucune transition
+    [ORDER_STATUS.DELIVERED]: [], // État final, aucune transition
+    [ORDER_STATUS.CANCELED]: [] // État final, aucune transition (FonctionnalitéMoyenne#1782)
   };
 
   const Order = sequelize.define('Order', {
@@ -69,7 +71,8 @@ module.exports = (sequelize) => {
         ORDER_STATUS.PENDING,
         ORDER_STATUS.CONFIRMED,
         ORDER_STATUS.SHIPPED,
-        ORDER_STATUS.DELIVERED
+        ORDER_STATUS.DELIVERED,
+        ORDER_STATUS.CANCELED // FonctionnalitéMoyenne#1782
       ),
       allowNull: false,
       defaultValue: ORDER_STATUS.PENDING,
@@ -79,7 +82,8 @@ module.exports = (sequelize) => {
             ORDER_STATUS.PENDING,
             ORDER_STATUS.CONFIRMED,
             ORDER_STATUS.SHIPPED,
-            ORDER_STATUS.DELIVERED
+            ORDER_STATUS.DELIVERED,
+            ORDER_STATUS.CANCELED // FonctionnalitéMoyenne#1782
           ]],
           msg: 'Statut de commande invalide'
         }
@@ -110,6 +114,27 @@ module.exports = (sequelize) => {
       type: DataTypes.TEXT,
       allowNull: true,
       comment: 'Notes internes sur la commande'
+    },
+    // Champs de dates de suivi (FonctionnalitéMoyenne#1782)
+    canceledAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: 'Date d\'annulation de la commande'
+    },
+    confirmedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: 'Date de confirmation de la commande'
+    },
+    shippedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: 'Date d\'expédition de la commande'
+    },
+    deliveredAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: 'Date de livraison de la commande'
     }
   }, {
     sequelize,
@@ -208,17 +233,33 @@ module.exports = (sequelize) => {
     
     // Ajout de données spécifiques selon le statut
     switch (newStatus) {
+      case ORDER_STATUS.CONFIRMED:
+        // Marquer la date de confirmation (FonctionnalitéMoyenne#1782)
+        this.confirmedAt = new Date();
+        break;
+        
       case ORDER_STATUS.SHIPPED:
         // Générer un numéro de suivi si pas déjà défini
         if (!this.trackingNumber) {
           this.trackingNumber = `TRK-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
         }
+        // Marquer la date d'expédition (FonctionnalitéMoyenne#1782)
+        this.shippedAt = new Date();
         break;
         
       case ORDER_STATUS.DELIVERED:
         // Marquer la date de livraison dans les notes
         const deliveryNote = `Livré le ${new Date().toLocaleDateString('fr-FR')}`;
         this.notes = this.notes ? `${this.notes}\n${deliveryNote}` : deliveryNote;
+        // Marquer la date de livraison (FonctionnalitéMoyenne#1782)
+        this.deliveredAt = new Date();
+        break;
+        
+      case ORDER_STATUS.CANCELED:
+        // Marquer la date d'annulation (FonctionnalitéMoyenne#1782)
+        this.canceledAt = new Date();
+        const cancelNote = `Commande annulée le ${new Date().toLocaleDateString('fr-FR')}`;
+        this.notes = this.notes ? `${this.notes}\n${cancelNote}` : cancelNote;
         break;
     }
     
@@ -247,11 +288,19 @@ module.exports = (sequelize) => {
   };
 
   /**
+   * Méthode pour vérifier si la commande peut être annulée (FonctionnalitéMoyenne#1782)
+   * @returns {boolean} - True si la commande peut être annulée
+   */
+  Order.prototype.isCancelable = function() {
+    return this.status === ORDER_STATUS.PENDING;
+  };
+
+  /**
    * Méthode pour vérifier si la commande est terminée
-   * @returns {boolean} - True si la commande est livrée
+   * @returns {boolean} - True si la commande est livrée ou annulée
    */
   Order.prototype.isCompleted = function() {
-    return this.status === ORDER_STATUS.DELIVERED;
+    return this.status === ORDER_STATUS.DELIVERED || this.status === ORDER_STATUS.CANCELED;
   };
 
   /**
