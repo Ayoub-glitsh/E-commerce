@@ -10,6 +10,7 @@ const reviewRoutes = require('./routes/reviews');
 const cartRoutes = require('./routes/cart');
 const wishlistRoutes = require('./routes/wishlist');
 const orderRoutes = require('./routes/orders');
+const paymentRoutes = require('./routes/payments');
 
 // Initialisation de l'application Express
 const app = express();
@@ -66,6 +67,9 @@ app.use('/api/wishlist', wishlistRoutes);
 
 // Routes des commandes (authentification requise)
 app.use('/api/orders', orderRoutes);
+
+// Routes des paiements (FonctionnalitéHaute#1780)
+app.use('/api/payments', paymentRoutes);
 
 // Route de test de la base de données
 app.get('/api/test-db', async (req, res) => {
@@ -157,7 +161,10 @@ app.use((req, res) => {
       'POST /api/wishlist',
       'DELETE /api/wishlist/:productId',
       'DELETE /api/wishlist',
-      'GET /api/wishlist/check/:productId'
+      'GET /api/wishlist/check/:productId',
+      'POST /api/payments/create-intent (AUTH)',
+      'GET /api/payments/config',
+      'POST /api/payments/webhook'
     ]
   });
 });
