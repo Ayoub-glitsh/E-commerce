@@ -11,6 +11,10 @@ const cartRoutes = require('./routes/cart');
 const wishlistRoutes = require('./routes/wishlist');
 const orderRoutes = require('./routes/orders');
 const paymentRoutes = require('./routes/payments');
+const webhookRoutes = require('./routes/webhooks');
+
+// Importation des middlewares
+const rawBodyMiddleware = require('./middleware/rawBody');
 
 // Initialisation de l'application Express
 const app = express();
@@ -23,6 +27,9 @@ app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true
 }));
+
+// Middleware pour raw body sur les webhooks (avant express.json())
+app.use(rawBodyMiddleware);
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -70,6 +77,9 @@ app.use('/api/orders', orderRoutes);
 
 // Routes des paiements (FonctionnalitéHaute#1780)
 app.use('/api/payments', paymentRoutes);
+
+// Routes des webhooks (FonctionnalitéHaute#1781)
+app.use('/webhooks', webhookRoutes);
 
 // Route de test de la base de données
 app.get('/api/test-db', async (req, res) => {
@@ -164,7 +174,8 @@ app.use((req, res) => {
       'GET /api/wishlist/check/:productId',
       'POST /api/payments/create-intent (AUTH)',
       'GET /api/payments/config',
-      'POST /api/payments/webhook'
+      'POST /api/payments/webhook',
+      'POST /webhooks/stripe'
     ]
   });
 });
