@@ -251,9 +251,15 @@ class OrderController {
         availableTransitions: order.getAvailableTransitions(),
         isModifiable: order.isModifiable(),
         isCompleted: order.isCompleted(),
+        isCancelable: order.isCancelable(), // FonctionnalitéMoyenne#1782
         // Sous-tâche 3: Dates complètes
         createdAt: order.created_at,
-        updatedAt: order.updated_at
+        updatedAt: order.updated_at,
+        // Dates de suivi (FonctionnalitéMoyenne#1782)
+        canceledAt: order.canceled_at,
+        confirmedAt: order.confirmed_at,
+        shippedAt: order.shipped_at,
+        deliveredAt: order.delivered_at
       }));
 
       // Pagination détaillée
@@ -360,6 +366,7 @@ class OrderController {
         availableTransitions: order.getAvailableTransitions(),
         isModifiable: order.isModifiable(),
         isCompleted: order.isCompleted(),
+        isCancelable: order.isCancelable(), // FonctionnalitéMoyenne#1782
         
         // Informations utilisateur (sans données sensibles)
         user: order.user ? {
@@ -370,7 +377,12 @@ class OrderController {
         
         // Dates complètes selon spécification
         createdAt: order.created_at,
-        updatedAt: order.updated_at
+        updatedAt: order.updated_at,
+        // Dates de suivi (FonctionnalitéMoyenne#1782)
+        canceledAt: order.canceled_at,
+        confirmedAt: order.confirmed_at,
+        shippedAt: order.shipped_at,
+        deliveredAt: order.delivered_at
       };
 
       // Log des détails pour debugging
@@ -443,6 +455,197 @@ class OrderController {
   }
 
   /**
+   * PUT /api/orders/:orderId/cancel - Annuler une commande (FonctionnalitéMoyenne#1782)
+   * Sous-tâche 1: Implémenter PUT /orders/:id/cancel : vérifier que status=pending avant d'autoriser
+   * Sous-tâche 2: Créer un champ canceledAt et passer status à 'canceled'
+   * 
+   * @param {Object} req - Requête Express
+   * @param {Object} res - Réponse Express
+   */
+  static async cancelOrder(req, res) {
+    try {
+      const { orderId } = req.params;
+      const userId = req.user.id;
+      const { reason } = req.body; // Raison d'annulation optionnelle
+
+      console.log(`🚫 FonctionnalitéMoyenne#1782 - Tentative d'annulation commande ${orderId} par utilisateur ${userId}`);
+
+      // Trouver la commande
+      const order = await Order.findOne({
+        where: { 
+          orderId: orderId,
+          userId: userId // Sécurité: l'utilisateur ne peut annuler que ses propres commandes
+        }
+      });
+
+      if (!order) {
+        return res.status(404).json({
+          success: false,
+          message: 'Commande non trouvée ou accès non autorisé'
+        });
+      }
+
+      // Sous-tâche 1: Vérifier que status=pending avant d'autoriser l'annulation
+      if (order.status !== 'pending') {
+        console.log(`❌ Tentative d'annulation refusée - Commande ${orderId} n'est pas en statut pending (actuel: ${order.status})`);
+        return res.status(400).json({
+          success: false,
+          message: `Impossible d'annuler une commande avec le statut "${order.status}". Seules les commandes en attente ("pending") peuvent être annulées.`,
+          data: {
+            currentStatus: order.status,
+            cancelable: false,
+            allowedCancelationStatuses: ['pending']
+          }
+        });
+      }
+
+      // Vérifier si la commande peut être annulée (double validation)
+      if (!order.isCancelable()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Cette commande ne peut pas être annulée dans son état actuel',
+          data: {
+            currentStatus: order.status,
+            cancelable: false
+          }
+        });
+      }
+
+      // Sous-tâche 2: Passer status à 'canceled' (automatiquement avec canceledAt via updateStatus)
+      try {
+        // Ajouter la raison d'annulation aux notes si fournie
+        if (reason) {
+          const cancelReason = `Raison d'annulation: ${reason}`;
+          order.notes = order.notes ? `${order.notes}\n${cancelReason}` : cancelReason;
+        }
+
+        // Utiliser updateStatus qui se charge de la validation et de la mise à jour de canceledAt
+        await order.updateStatus('canceled');
+
+        console.log(`✅ Commande ${orderId} annulée avec succès`);
+
+        res.status(200).json({
+          success: true,
+          message: 'Commande annulée avec succès',
+          data: {
+            orderId: order.orderId,
+            previousStatus: 'pending',
+            currentStatus: order.status,
+            canceledAt: order.canceledAt,
+            reason: reason || null,
+            updatedAt: order.updated_at
+          }
+        });
+
+      } catch (transitionError) {
+        console.log(`❌ Erreur lors de l'annulation: ${transitionError.message}`);
+        
+        return res.status(400).json({
+          success: false,
+          message: transitionError.message,
+          data: {
+            currentStatus: order.status,
+            cancelable: order.isCancelable()
+          }
+        });
+      }
+
+    } catch (error) {
+      console.error('Erreur lors de l\'annulation de la commande:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erreur interne du serveur lors de l\'annulation de la commande'
+      });
+    }
+  }
+
+  /**
+   * GET /api/orders/:orderId/tracking - Obtenir le suivi d'une commande (FonctionnalitéMoyenne#1782)
+   * Sous-tâche 3: Implémenter GET /orders/:id/tracking : retourner { status, createdAt, confirmedAt, shippedAt, deliveredAt }
+   * 
+   * @param {Object} req - Requête Express
+   * @param {Object} res - Réponse Express
+   */
+  static async getOrderTracking(req, res) {
+    try {
+      const { orderId } = req.params;
+      const userId = req.user.id;
+
+      console.log(`📍 FonctionnalitéMoyenne#1782 - Suivi commande ${orderId} pour utilisateur ${userId}`);
+
+      // Récupérer la commande avec toutes les informations de suivi
+      const order = await Order.findOne({
+        where: { 
+          orderId: orderId,
+          userId: userId // Sécurité: utilisateur ne peut suivre que ses propres commandes
+        },
+        attributes: [
+          'orderId', 'status', 'trackingNumber',
+          'created_at', 'updated_at', 'canceled_at', 'confirmed_at', 'shipped_at', 'delivered_at'
+        ]
+      });
+
+      if (!order) {
+        return res.status(404).json({
+          success: false,
+          message: 'Commande non trouvée ou accès non autorisé'
+        });
+      }
+
+      // Sous-tâche 3: Retourner le suivi simplifié selon spécification
+      const trackingData = {
+        orderId: order.orderId,
+        status: order.status,
+        createdAt: order.created_at,
+        confirmedAt: order.confirmed_at || null,
+        shippedAt: order.shipped_at || null,
+        deliveredAt: order.delivered_at || null,
+        canceledAt: order.canceled_at || null, // Ajout du support d'annulation
+        trackingNumber: order.trackingNumber || null
+      };
+
+      // Calculer les informations de progression
+      const progressInfo = {
+        isCompleted: order.status === 'delivered' || order.status === 'canceled',
+        isCanceled: order.status === 'canceled',
+        currentStep: order.status,
+        timeline: [
+          { step: 'pending', completed: true, date: order.created_at },
+          { step: 'confirmed', completed: !!order.confirmed_at, date: order.confirmed_at },
+          { step: 'shipped', completed: !!order.shipped_at, date: order.shipped_at },
+          { step: 'delivered', completed: !!order.delivered_at, date: order.delivered_at }
+        ]
+      };
+
+      // Si annulée, ajuster la timeline
+      if (order.status === 'canceled') {
+        progressInfo.timeline = [
+          { step: 'pending', completed: true, date: order.created_at },
+          { step: 'canceled', completed: true, date: order.canceled_at }
+        ];
+      }
+
+      console.log(`📍 Suivi commande ${orderId}: ${order.status}`);
+
+      res.status(200).json({
+        success: true,
+        message: 'Suivi de commande récupéré avec succès',
+        data: {
+          ...trackingData,
+          progress: progressInfo
+        }
+      });
+
+    } catch (error) {
+      console.error('Erreur lors de la récupération du suivi:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erreur interne du serveur lors de la récupération du suivi'
+      });
+    }
+  }
+
+  /**
    * GET /api/orders/statuses - Obtenir tous les statuts disponibles
    * 
    * @param {Object} req - Requête Express
@@ -459,7 +662,8 @@ class OrderController {
             [Order.STATUS.PENDING]: 'En attente de confirmation',
             [Order.STATUS.CONFIRMED]: 'Confirmée et en préparation',
             [Order.STATUS.SHIPPED]: 'Expédiée',
-            [Order.STATUS.DELIVERED]: 'Livrée'
+            [Order.STATUS.DELIVERED]: 'Livrée',
+            [Order.STATUS.CANCELED]: 'Annulée' // FonctionnalitéMoyenne#1782
           }
         }
       });
