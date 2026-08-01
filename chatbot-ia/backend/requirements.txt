@@ -1,0 +1,16 @@
+# Dépendances du backend Python du chatbot IA (TâcheHaute #1673)
+#
+# Installation :
+#   python -m venv venv
+#   venv\Scripts\activate      (Windows)
+#   pip install -r requirements.txt
+#
+# Versions minimales raisonnables (>=X.X) pour rester compatible sans figer
+# une version exacte trop stricte.
+
+flask>=3.0
+flask-cors>=4.0
+groq>=0.11
+python-dotenv>=1.0
+
+
