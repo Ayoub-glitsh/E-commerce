@@ -12,6 +12,7 @@ const wishlistRoutes = require('./routes/wishlist');
 const orderRoutes = require('./routes/orders');
 const paymentRoutes = require('./routes/payments');
 const webhookRoutes = require('./routes/webhooks');
+const internalChatbotRoutes = require('./routes/internalChatbotRoutes');
 
 // Importation des middlewares
 const rawBodyMiddleware = require('./middleware/rawBody');
@@ -80,6 +81,11 @@ app.use('/api/payments', paymentRoutes);
 
 // Routes des webhooks (FonctionnalitéHaute#1781)
 app.use('/webhooks', webhookRoutes);
+
+// Routes internes du chatbot IA (FonctionnalitéHaute#1671)
+// ⚠️ Accès interne uniquement (Flask chatbot → Node, réseau local).
+// En production : restreindre l'accès (clé interne partagée ou IP/réseau).
+app.use('/api/internal', internalChatbotRoutes);
 
 // Route de test de la base de données
 app.get('/api/test-db', async (req, res) => {
