@@ -1,6 +1,8 @@
 require('dotenv').config();
+console.log("JWT_SECRET =", process.env.JWT_SECRET);
 const express = require('express');
 const cors = require('cors');
+
 
 // Importation des routes
 const authRoutes = require('./routes/auth');
@@ -10,10 +12,14 @@ const reviewRoutes = require('./routes/reviews');
 const cartRoutes = require('./routes/cart');
 const wishlistRoutes = require('./routes/wishlist');
 const orderRoutes = require('./routes/orders');
+const recommendationRoutes = require('./routes/recommendations');
+const eventRoutes = require('./routes/events');
+const searchRoutes = require('./routes/search');
 
 // Initialisation de l'application Express
 const app = express();
 const PORT = process.env.PORT || 3000;
+
 
 /**
  * Configuration des middlewares globaux
@@ -66,6 +72,15 @@ app.use('/api/wishlist', wishlistRoutes);
 
 // Routes des commandes (authentification requise)
 app.use('/api/orders', orderRoutes);
+
+// Routes de recommandations (publiques)
+app.use('/recommendations', recommendationRoutes);
+
+//Routes de events
+app.use('/events', eventRoutes);
+
+// Routes de recherche (NLP + classique)
+app.use('/search', searchRoutes);
 
 // Route de test de la base de données
 app.get('/api/test-db', async (req, res) => {
@@ -157,7 +172,13 @@ app.use((req, res) => {
       'POST /api/wishlist',
       'DELETE /api/wishlist/:productId',
       'DELETE /api/wishlist',
-      'GET /api/wishlist/check/:productId'
+      'GET /api/wishlist/check/:productId',
+      'GET /recommendations/similar/:product_id',
+      'POST /events/view',
+      'POST /events/purchase',
+      'GET /recommendations/for-you',
+      'POST /search/nlp',
+      'GET /search',
     ]
   });
 });
@@ -200,3 +221,4 @@ if (require.main === module) {
 }
 
 module.exports = app;
+console.log("App.js reached the end");

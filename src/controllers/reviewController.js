@@ -1,7 +1,7 @@
 const { Review, Product, User } = require('../../models');
 const { v4: uuidv4 } = require('uuid');
 const { validationResult } = require('express-validator');
-
+const reviewSummaryService = require('../services/reviewSummaryService');
 /**
  * Contrôleur pour la gestion des avis produits
  */
@@ -248,5 +248,65 @@ async function updateProductRatingStats(productId) {
     console.error('Erreur lors de la mise à jour des statistiques du produit:', error);
   }
 }
+
+ReviewController.getReviewSummary = async (req, res) => {
+  try {
+    const { id: productId } = req.params;
+ 
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(productId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID de produit invalide'
+      });
+    }
+ 
+    const product = await Product.findByPk(productId);
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Produit non trouvé'
+      });
+    }
+ 
+    const reviews = await reviewSummaryService.getLatestReviews(productId);
+ 
+    if (reviews.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ce produit n\'a pas encore d\'avis à résumer'
+      });
+    }
+ 
+    let summary;
+    try {
+      summary = await reviewSummaryService.generateReviewSummary(reviews);
+    } catch (groqError) {
+      console.error('Erreur Groq lors du résumé des avis:', groqError.message);
+      return res.status(502).json({
+        success: false,
+        message: 'Impossible de générer le résumé des avis pour le moment',
+        error: process.env.NODE_ENV === 'development' ? groqError.message : undefined
+      });
+    }
+ 
+    res.status(200).json({
+      success: true,
+      data: {
+        productId,
+        reviewsAnalyzed: reviews.length,
+        summary
+      }
+    });
+ 
+  } catch (error) {
+    console.error('Erreur lors de la génération du résumé d\'avis:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur lors de la génération du résumé',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
 
 module.exports = ReviewController;
