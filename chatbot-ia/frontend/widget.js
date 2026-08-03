@@ -8,6 +8,12 @@
   // on throttle via un timestamp : ~25ms par "tick".
   const ANIMATION_INTERVAL = 25;
 
+  // Timeout (ms) au-delà duquel on abandonne une requête sans réponse (#1677).
+  const REQUEST_TIMEOUT_MS = 30000;
+
+  // Clé localStorage utilisée pour persister l'historique de conversation (#1677).
+  const STORAGE_KEY = "chatbot_conversation_history";
+
   let messages = []; // historique { role, content }
   let isTyping = false;
 
@@ -31,6 +37,43 @@
   const typingEl = document.getElementById("cw-typing");
   const errorEl = document.getElementById("cw-error");
 
+  // --- Persistance de l'historique en localStorage (#1677) ---
+  function saveHistoryToStorage(messages) {
+    try {
+      // On ignore les messages vides (ex: bulle assistant encore vide).
+      const history = messages.filter((m) => m && m.content !== "");
+      if (history.length === 0) {
+        // Rien à persister : on retire l'éventuelle clé restante.
+        localStorage.removeItem(STORAGE_KEY);
+        return;
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+    } catch (err) {
+      // Quota dépassé ou localStorage désactivé : on logge sans bloquer l'app.
+      console.warn("[chatbot] Impossible de sauvegarder l'historique :", err);
+    }
+  }
+
+  function loadHistoryFromStorage() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter(
+        (m) =>
+          m &&
+          typeof m.role === "string" &&
+          typeof m.content === "string" &&
+          m.content !== ""
+      );
+    } catch (err) {
+      // Clé absente, JSON invalide ou localStorage désactivé : historique vide.
+      console.warn("[chatbot] Impossible de charger l'historique :", err);
+      return [];
+    }
+  }
+
   function renderMessages() {
     messagesEl.innerHTML = "";
 
@@ -53,6 +96,9 @@
     });
 
     messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    // Persistance : le tableau messages vient d'être mis à jour (#1677).
+    saveHistoryToStorage(messages);
   }
 
   // Met à jour uniquement la dernière bulle assistant (évite de re-rendre
@@ -63,6 +109,8 @@
     const bubble = rows[rows.length - 1].querySelector(".cw-bubble");
     if (bubble) {
       bubble.textContent = text;
+      // Auto-scroll pendant l'animation letter-by-letter, pas seulement au
+      // premier rendu du message (#1677).
       messagesEl.scrollTop = messagesEl.scrollHeight;
     }
   }
@@ -154,6 +202,14 @@
     // clique "Nouvelle conversation" pendant la réception du stream.
     const abortController = new AbortController();
     currentAbort = abortController;
+    let didTimeout = false;
+
+    // Timeout de 30s : on abandonne la requête si le serveur ne répond pas.
+    // clearTimeout est appelé dès que la réponse arrive (voir try/finally).
+    const timeoutId = setTimeout(() => {
+      didTimeout = true;
+      abortController.abort();
+    }, REQUEST_TIMEOUT_MS);
 
     try {
       const res = await fetch(API_URL, {
@@ -165,6 +221,9 @@
         }),
         signal: abortController.signal,
       });
+
+      // La réponse est arrivée : le timeout n'a plus lieu d'être.
+      clearTimeout(timeoutId);
 
       if (!res.ok || !res.body) throw new Error("Réponse serveur invalide");
 
@@ -204,10 +263,27 @@
         }
       }
     } catch (err) {
-      if (err.name === "AbortError") return; // reset conversation → silence
+      if (err.name === "AbortError") {
+        if (didTimeout) {
+          // Timeout 30s : message dédié + retrait de la bulle assistant vide.
+          if (
+            messages[lastAssistantIndex] &&
+            messages[lastAssistantIndex].content === ""
+          ) {
+            messages.splice(lastAssistantIndex, 1);
+            renderMessages(); // re-rend + sauvegarde localStorage
+          }
+          showError("La requête a pris trop de temps, réessaie.");
+        }
+        // Sinon : reset volontaire (Nouvelle conversation) → silence.
+        return;
+      }
       showError("Connexion au chatbot impossible.");
     } finally {
+      clearTimeout(timeoutId); // par sécurité
       streamEnded = true;
+      // Persistance après la fin du stream (bulle assistant complète).
+      saveHistoryToStorage(messages);
       // Masquer le typing seulement si aucune animation n'est en cours.
       // Sinon, animateText() le fera quand displayedText === targetText.
       if (animationId === null) setTyping(false);
@@ -221,6 +297,15 @@
       currentAbort.abort();
       currentAbort = null;
     }
+    // Le timeout 30s associé est nettoyé dans le finally de sendMessage().
+
+    // Purger l'historique persisté (#1677)
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (err) {
+      console.warn("[chatbot] Impossible de supprimer l'historique :", err);
+    }
+
     // Annuler proprement l'animation en cours (éviter les animations fantômes)
     stopAnimation();
 
@@ -258,6 +343,8 @@
     if (e.key === "Enter") sendMessage();
   });
 
+  // Charger l'historique persisté avant le premier rendu (#1677)
+  messages = loadHistoryFromStorage();
   renderMessages();
 })();
 
