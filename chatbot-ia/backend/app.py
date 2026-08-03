@@ -353,9 +353,6 @@ def ai_summarize_reviews():
     return (
         jsonify(
             {"error": "Endpoint /ai/summarize-reviews non implémenté pour le moment."}
-        ),
-        501,
-    )
 
 
 # ---------------------------------------------------------------------------
