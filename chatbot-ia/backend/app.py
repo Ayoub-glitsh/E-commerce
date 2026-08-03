@@ -5,7 +5,7 @@ Point d'entrée Flask du backend Python du chatbot IA (TâcheHaute #1673)
 Structure prévue pour accueillir les routes définies dans
 chatbot-ia/docs/openapi.yaml :
     - POST /chat/message            (chatbot conversationnel en streaming SSE) ✅
-    - POST /ai/generate-description (génération de description produit)
+    - POST /ai/generate-description (génération de description produit) ✅
     - POST /ai/summarize-reviews    (résumé d'avis clients)
 
 La route /chat/message est implémentée (FonctionnalitéHaute #1671) :
@@ -14,8 +14,14 @@ La route /chat/message est implémentée (FonctionnalitéHaute #1671) :
     - appel à l'API Groq (Llama 3.3 70B) avec streaming SSE
     - réponse au format Server-Sent Events (text/event-stream)
 
-Les routes /ai/* restent des stubs retournant un 501 "Not Implemented".
-Elles seront implémentées dans les prochaines sous-tâches.
+La route /ai/generate-description est implémentée (FonctionnalitéMoyenne #1672) :
+    - validation du body (name et category obligatoires, tags optionnel)
+    - construction d'un prompt marketing dédié (services/description_prompt.py)
+    - appel SYNCHRONE (stream=False) à l'API Groq (Llama 3.3 70B)
+    - réponse JSON { "description": "..." } (2-3 phrases)
+
+La route /ai/summarize-reviews reste un stub retournant un 501 "Not Implemented".
+Elle sera implémentée dans une prochaine sous-tâche (hors scope #1672).
 
 ----------------------------------------------------------------------------
 INSTALLATION (environnement virtuel) :
@@ -36,6 +42,7 @@ from flask_cors import CORS
 import config
 from services.catalog_client import get_catalogue_text
 from services.chatbot_prompt import build_messages_for_groq
+from services.description_prompt import build_description_prompt
 
 # ---------------------------------------------------------------------------
 # Validation de l'environnement au démarrage
@@ -69,6 +76,24 @@ def health():
 # ---------------------------------------------------------------------------
 # Helpers de validation
 # ---------------------------------------------------------------------------
+def get_groq_client():
+    """
+    Créer (paresseusement) le client Groq utilisé par toutes les routes IA.
+
+    L'import du SDK est retardé (tardif) pour deux raisons :
+      - éviter d'échouer au démarrage si le SDK n'est pas installé ;
+      - faciliter le mock du module `groq` dans les scripts de test.
+
+    Le client est réutilisé par /chat/message (streaming SSE) et
+    /ai/generate-description (appel synchrone), sans dupliquer l'initialisation.
+
+    @returns: instance du client Groq (groq.Groq)
+    """
+    from groq import Groq
+
+    return Groq(api_key=config.get_groq_api_key())
+
+
 def validate_history_message(msg):
     """
     Valider un message de l'historique de conversation.
@@ -125,6 +150,62 @@ def validate_chat_request(body):
     return message, conversation_history
 
 
+def validate_description_request(body):
+    """
+    Valider le body d'une requête POST /ai/generate-description.
+
+    Règles :
+      - name : string obligatoire, non vide
+      - category : string obligatoire, non vide
+      - tags : array optionnel (défaut []) d'éléments string
+
+    @param body: body JSON brut de la requête
+    @returns: (name, category, tags) si valide
+    @raises ValueError: avec un message d'erreur clair si la validation échoue
+    """
+    if not isinstance(body, dict):
+        raise ValueError("Le corps de la requête doit être un objet JSON.")
+
+    # --- name : obligatoire, non vide ---
+    name = body.get("name")
+    if not isinstance(name, str) or name.strip() == "":
+        raise ValueError("Les champs 'name' et 'category' sont requis.")
+
+    # --- category : obligatoire, non vide ---
+    category = body.get("category")
+    if not isinstance(category, str) or category.strip() == "":
+        raise ValueError("Les champs 'name' et 'category' sont requis.")
+
+    # --- tags : optionnel, tableau de strings (défaut []) ---
+    tags = body.get("tags", [])
+    if not isinstance(tags, list):
+        raise ValueError("Le champ 'tags' doit être un tableau de strings.")
+    if not all(isinstance(tag, str) for tag in tags):
+        raise ValueError("Le champ 'tags' doit être un tableau de strings.")
+
+    return name.strip(), category.strip(), tags
+
+
+def clean_generated_description(text):
+    """
+    Nettoyer la description générée par le modèle.
+
+    Supprime les espaces superflus et, si le modèle a entouré le texte de
+    guillemets (simples ou doubles, avec apostrophes typographiques), les retire.
+
+    @param text: texte brut renvoyé par Groq
+    @returns: texte nettoyé
+    """
+    cleaned = text.strip() if isinstance(text, str) else ""
+    if len(cleaned) >= 2:
+        first, last = cleaned[0], cleaned[-1]
+        if (first == last and first in ('"', "'", "«", "»")) or (
+            first == "«" and last == "»"
+        ):
+            cleaned = cleaned[1:-1].strip()
+    return cleaned
+
+
 # ---------------------------------------------------------------------------
 # Streaming SSE — générateur de la réponse
 # ---------------------------------------------------------------------------
@@ -150,9 +231,7 @@ def stream_chat_response(message, conversation_history):
         messages = build_messages_for_groq(conversation_history, catalogue_text)
 
         # 3. Appeler l'API Groq avec streaming
-        from groq import Groq
-
-        client = Groq(api_key=config.get_groq_api_key())
+        client = get_groq_client()
 
         stream = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
@@ -212,23 +291,58 @@ def chat_message():
 
 
 # ---------------------------------------------------------------------------
-# Stubs des routes /ai (implémentation ultérieure)
+# Route — POST /ai/generate-description (appel synchrone Groq)
 # ---------------------------------------------------------------------------
 @app.route("/ai/generate-description", methods=["POST"])
 def ai_generate_description():
     """
-    Stub — Générer une description produit.
+    Générer une description produit marketing e-commerce (2-3 phrases).
 
-    À implémenter dans une prochaine sous-tâche (intégration Groq).
+    Body attendu :
+      - name : string obligatoire
+      - category : string obligatoire
+      - tags : array optionnel (défaut [])
+
+    @returns: 200 { "description": "..." } / 400 { "error": "..." } / 500 { "error": "..." }
     """
-    return (
-        jsonify(
-            {"error": "Endpoint /ai/generate-description non implémenté pour le moment."}
-        ),
-        501,
-    )
+    # --- Validation du body ---
+    try:
+        name, category, tags = validate_description_request(
+            request.get_json(silent=True)
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    # --- Génération de la description via Groq (synchrone, pas de streaming) ---
+    try:
+        # 1. Construire le prompt marketing dédié au produit
+        prompt = build_description_prompt(name, category, tags)
+
+        # 2. Appeler l'API Groq en synchrone (stream=False par défaut ici)
+        client = get_groq_client()
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            stream=False,
+        )
+
+        # 3. Extraire et nettoyer le texte de la réponse
+        raw_text = (
+            response.choices[0].message.content if response.choices else ""
+        )
+        description = clean_generated_description(raw_text)
+
+        # 4. Répondre avec le format du contrat (docs/openapi.yaml)
+        return jsonify({"description": description}), 200
+
+    except Exception as exc:  # noqa: BLE001 - toutes les erreurs Groq (timeout, rate limit, etc.)
+        print(f"❌ Erreur lors de la génération de description : {exc}")
+        return jsonify({"error": "Impossible de générer la description."}), 500
 
 
+# ---------------------------------------------------------------------------
+# Stubs des routes /ai (implémentation ultérieure)
+# ---------------------------------------------------------------------------
 @app.route("/ai/summarize-reviews", methods=["POST"])
 def ai_summarize_reviews():
     """
