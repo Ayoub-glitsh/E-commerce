@@ -500,3 +500,121 @@ Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de 
 ---
 
 ⭐ **N'hésitez pas à donner une étoile si ce projet vous aide !**
+
+---
+
+## 🤖 Module Chatbot IA
+
+Le module **Chatbot IA** est un sous-projet complet en architecture microservices qui ajoute une assistance conversationnelle intelligente à la plateforme e-commerce. Il est organisé dans le dossier `chatbot-ia/` et se compose d'un backend Python (Flask), d'un backend Node.js existant et d'un widget frontend.
+
+### 🏗️ Architecture
+
+Le flux suit une architecture en microservices :
+
+```
+┌─────────────────────┐     POST /chat/message      ┌──────────────────────────┐
+│  Frontend (widget)  │ ──────────────────────────► │  Backend Flask (port 5000)│
+│  widget.js / Chatbot.jsx │    (streaming SSE)     │  chatbot-ia/backend/      │
+└─────────────────────┘  ◄──────────────────────────┘                           │
+         ▲                     réponse stream (SSE)                  │
+         │                                                           │
+         │                                                  │  GET /api/internal/chatbot-catalog
+         │                                                  ▼
+         │                                          ┌──────────────────────────┐
+         │                                          │  Backend Node.js (port 3000)│
+         │                                          └────────────┬─────────────┘
+         │                                                       │
+         │                                                       ▼
+         │                                          ┌──────────────────────────┐
+         │                                          │   PostgreSQL (Neon)      │
+         │                                          │      via Sequelize       │
+         │                                          └──────────────────────────┘
+         │
+         │  Prompt système + catalogue + historique
+         ▼
+┌─────────────────────────────────────────────────────────────┐
+│                     API Groq (Llama 3.3 70B)                │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Détail du flux :**
+
+1. **Frontend** (`widget.js` standalone ou `Chatbot.jsx` dans l'app React) envoie une requête `POST /chat/message` au backend Flask (port 5000) avec streaming SSE.
+2. Le backend Flask appelle en interne le backend Node.js (port 3000) via `GET /api/internal/chatbot-catalog` pour récupérer le catalogue produits déjà formaté.
+3. Le backend Node.js interroge PostgreSQL (Neon) via Sequelize.
+4. Le backend Flask appelle ensuite l'API Groq (Llama 3.3 70B) avec le prompt système + le catalogue + l'historique de conversation.
+5. La réponse est relayée au frontend en streaming (Server-Sent Events).
+
+### 🧠 Provider IA
+
+Le module utilise **Groq** avec le modèle **Llama 3.3 70B** (`llama-3.3-70b-versatile`), et non Anthropic/Claude, principalement pour des **raisons de coût** : l'API Groq est gratuite, ce qui permet de faire tourner le chatbot et les utilitaires IA sans frais de licence.
+
+### 🔌 Endpoints disponibles
+
+Le backend Flask expose les 4 routes suivantes :
+
+| Méthode | Route | Description |
+|---------|-------|-------------|
+| `GET` | `/health` | Vérification du bon fonctionnement du serveur (`{ "status": "ok" }`) |
+| `POST` | `/chat/message` | Message conversationnel au chatbot avec **réponse en streaming SSE** |
+| `POST` | `/ai/generate-description` | Génération d'une description produit marketing (2-3 phrases) |
+| `POST` | `/ai/summarize-reviews` | Analyse d'avis clients et résumé structuré `pros`/`cons` |
+
+> 📖 La spécification complète (schémas de requête/réponse, exemples, codes d'erreur) est disponible dans [`chatbot-ia/docs/openapi.yaml`](chatbot-ia/docs/openapi.yaml).
+
+### ✨ Fonctionnalités frontend
+
+- 💬 **Bulles distinctes** user/assistant avec icônes
+- ⏳ **Streaming letter-by-letter** (affichage progressif du texte reçu)
+- ✍️ **Indicateur "en train d'écrire..."**
+- 💾 **Persistance localStorage** de l'historique de conversation
+- ⏱️ **Timeout de 30s** sur les requêtes (via `AbortController`)
+- 🆕 **Bouton "Nouvelle conversation"** (reset)
+- 📜 **Auto-scroll** pendant l'animation
+- 📱 **Design responsive mobile**
+
+### 🚀 Installation et lancement du backend Flask
+
+> ⚠️ Le **backend Node.js principal** doit tourner en parallèle sur le port 3000 (c'est lui qui fournit le catalogue produits via la route interne).
+
+```bash
+# 1. Créer et activer l'environnement virtuel
+python -m venv venv
+venv\Scripts\activate        # Windows
+# source venv/bin/activate   # macOS / Linux
+
+# 2. Installer les dépendances
+pip install -r chatbot-ia/backend/requirements.txt
+
+# 3. Copier le fichier d'environnement
+cp chatbot-ia/backend/.env.example chatbot-ia/backend/.env
+
+# 4. Renseigner la clé API Groq dans le .env puis lancer le serveur
+python chatbot-ia/backend/app.py
+```
+
+Le serveur Flask démarre alors sur `http://localhost:5000`.
+
+### 🔧 Variables d'environnement
+
+Fichier `chatbot-ia/backend/.env` :
+
+```env
+# Clé API Groq (obligatoire)
+GROQ_API_KEY=your_groq_api_key_here
+
+# Port du serveur Flask (défaut : 5000)
+PORT=5000
+
+# Environnement Flask
+FLASK_ENV=development
+
+# URL du backend Node.js (défaut : http://localhost:3000)
+NODE_BACKEND_URL=http://localhost:3000
+```
+
+### 🔑 Comment obtenir une clé API Groq gratuite
+
+1. Créez un compte sur [console.groq.com](https://console.groq.com).
+2. Rendez-vous dans la section **API Keys**.
+3. Cliquez sur **Create API Key** et copiez la clé générée dans votre fichier `.env`.
