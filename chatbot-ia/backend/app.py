@@ -20,8 +20,12 @@ La route /ai/generate-description est implémentée (FonctionnalitéMoyenne #167
     - appel SYNCHRONE (stream=False) à l'API Groq (Llama 3.3 70B)
     - réponse JSON { "description": "..." } (2-3 phrases)
 
-La route /ai/summarize-reviews reste un stub retournant un 501 "Not Implemented".
-Elle sera implémentée dans une prochaine sous-tâche (hors scope #1672).
+La route /ai/summarize-reviews est implémentée (FonctionnalitéMoyenne #1674) :
+    - validation du body (reviews obligatoire, array non vide de strings)
+    - construction d'un prompt dédié (services/reviews_summary_prompt.py)
+    - appel SYNCHRONE (stream=False) à l'API Groq (Llama 3.3 70B)
+    - parsing JSON robuste avec nettoyage des balises ```json
+    - réponse JSON { "summary": { "pros": [...], "cons": [...] } }
 
 ----------------------------------------------------------------------------
 INSTALLATION (environnement virtuel) :
@@ -43,6 +47,7 @@ import config
 from services.catalog_client import get_catalogue_text
 from services.chatbot_prompt import build_messages_for_groq
 from services.description_prompt import build_description_prompt
+from services.reviews_summary_prompt import build_summary_prompt
 
 # ---------------------------------------------------------------------------
 # Validation de l'environnement au démarrage
@@ -341,18 +346,147 @@ def ai_generate_description():
 
 
 # ---------------------------------------------------------------------------
-# Stubs des routes /ai (implémentation ultérieure)
+# Helper de validation — POST /ai/summarize-reviews
+# ---------------------------------------------------------------------------
+def validate_reviews_request(body):
+    """
+    Valider le body d'une requête POST /ai/summarize-reviews.
+
+    Règles :
+      - reviews : array obligatoire, non vide, dont chaque élément est une
+        string non vide
+
+    @param body: body JSON brut de la requête
+    @returns: la liste des avis validée (list de strings)
+    @raises ValueError: avec un message d'erreur clair si la validation échoue
+    """
+    if not isinstance(body, dict):
+        raise ValueError(
+            "Le champ 'reviews' doit être un tableau non vide."
+        )
+
+    # --- reviews : obligatoire, array non vide de strings non vides ---
+    reviews = body.get("reviews")
+    if not isinstance(reviews, list) or len(reviews) == 0:
+        raise ValueError(
+            "Le champ 'reviews' doit être un tableau non vide."
+        )
+    for i, review in enumerate(reviews):
+        if not isinstance(review, str) or review.strip() == "":
+            raise ValueError(
+                "Le champ 'reviews' doit être un tableau non vide."
+            )
+
+    # Retourner les avis nettoyés (strip de chaque élément)
+    return [r.strip() for r in reviews]
+
+
+# ---------------------------------------------------------------------------
+# Helper — nettoyage du JSON brut renvoyé par Groq
+# ---------------------------------------------------------------------------
+def _clean_json_response(raw_text):
+    """
+    Nettoyer la réponse JSON brute de Groq avant de la parser.
+
+    Le modèle peut parfois entourer sa réponse de balises Markdown
+    ```json ... ``` malgré l'instruction stricte du prompt. Cette fonction
+    supprime ces balises ainsi que tout espace/blanc superflu.
+
+    @param raw_text: texte brut renvoyé par Groq
+    @returns: texte nettoyé, prêt pour json.loads()
+    """
+    if not isinstance(raw_text, str):
+        return ""
+
+    cleaned = raw_text.strip()
+
+    # Supprimer les éventuelles balises ```json ... ``` ou ``` ... ```
+    if cleaned.startswith("```"):
+        # Enlever le ``` d'ouverture et éventuellement le mot "json"
+        cleaned = cleaned[3:].lstrip()
+        if cleaned.lower().startswith("json"):
+            cleaned = cleaned[4:].lstrip()
+        # Enlever le ``` de fermeture s'il existe
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3].rstrip()
+
+    return cleaned.strip()
+
+
+# ---------------------------------------------------------------------------
+# Route — POST /ai/summarize-reviews (appel synchrone Groq)
 # ---------------------------------------------------------------------------
 @app.route("/ai/summarize-reviews", methods=["POST"])
 def ai_summarize_reviews():
     """
-    Stub — Résumer des avis clients.
+    Analyser une liste d'avis clients et générer un résumé structuré pros/cons.
 
-    À implémenter dans une prochaine sous-tâche (intégration Groq).
+    Body attendu :
+      - reviews : array de strings, obligatoire, non vide
+
+    @returns: 200 { "summary": { "pros": [...], "cons": [...] } }
+              400 { "error": "Le champ 'reviews' doit être un tableau non vide." }
+              500 { "error": "Impossible de résumer les avis." }
     """
-    return (
-        jsonify(
-            {"error": "Endpoint /ai/summarize-reviews non implémenté pour le moment."}
+    # --- Validation du body ---
+    try:
+        reviews = validate_reviews_request(request.get_json(silent=True))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    # --- Génération du résumé via Groq (synchrone, pas de streaming) ---
+    try:
+        # 1. Construire le prompt dédié au résumé d'avis
+        prompt = build_summary_prompt(reviews)
+
+        # 2. Appeler l'API Groq en synchrone (stream=False)
+        client = get_groq_client()
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            stream=False,
+        )
+
+        # 3. Extraire le texte brut de la réponse
+        raw_text = (
+            response.choices[0].message.content if response.choices else ""
+        )
+
+        # 4. Nettoyer le texte et le parser en JSON
+        cleaned_text = _clean_json_response(raw_text)
+
+        if not cleaned_text:
+            print("❌ Résumé avis : réponse vide du modèle Groq")
+            return jsonify({"error": "Impossible de résumer les avis."}), 500
+
+        try:
+            parsed = json.loads(cleaned_text)
+        except json.JSONDecodeError as exc:
+            print(f"❌ Résumé avis : échec du parsing JSON — {exc}")
+            print(f"   Texte reçu : {raw_text[:500]}")
+            return jsonify({"error": "Impossible de résumer les avis."}), 500
+
+        # 5. Valider la structure du JSON parsé
+        if not isinstance(parsed, dict):
+            print(f"❌ Résumé avis : la réponse n'est pas un objet JSON")
+            return jsonify({"error": "Impossible de résumer les avis."}), 500
+
+        pros = parsed.get("pros")
+        cons = parsed.get("cons")
+
+        if not isinstance(pros, list) or not isinstance(cons, list):
+            print(
+                f"❌ Résumé avis : structure invalide — "
+                f"pros={type(pros).__name__}, cons={type(cons).__name__}"
+            )
+            return jsonify({"error": "Impossible de résumer les avis."}), 500
+
+        # 6. Répondre avec le format du contrat (docs/openapi.yaml)
+        return jsonify({"summary": {"pros": pros, "cons": cons}}), 200
+
+    except Exception as exc:  # noqa: BLE001 - toutes les erreurs Groq (timeout, rate limit, etc.)
+        print(f"❌ Erreur lors du résumé d'avis : {exc}")
+        return jsonify({"error": "Impossible de résumer les avis."}), 500
 
 
 # ---------------------------------------------------------------------------
