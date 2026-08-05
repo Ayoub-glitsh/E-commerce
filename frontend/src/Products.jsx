@@ -19,11 +19,36 @@ function Products() {
 
     const lastProduct=productsPerPage*currentPage;
     const firstProduct=lastProduct-productsPerPage;
-    useEffect(() => {
+useEffect(() => {
         async function loadProducts() {
             const response = await fetch("/api/products");
             const data = await response.json();
-            setProducts(data);
+
+            // La réponse peut venir soit du mock MSW (tableau direct),
+            // soit du backend réel ({ data: { products: [...] } }).
+            const rawList = Array.isArray(data)
+                ? data
+                : data?.data?.products ?? data?.products ?? [];
+
+            // Normalise les champs pour correspondre à l'affichage attendu
+            // (image -> images, rating -> ratingAvg, category objet -> string).
+            const normalized = rawList.map((product) => {
+                const category =
+                    typeof product.category === "string"
+                        ? product.category
+                        : product.category?.name ?? "";
+
+                const images = product.images ?? product.image ?? [];
+
+                return {
+                    ...product,
+                    image: Array.isArray(images) ? images[0] : images,
+                    rating: product.rating ?? product.ratingAvg ?? 0,
+                    category,
+                };
+            });
+
+            setProducts(normalized);
         }
 
         loadProducts();
@@ -268,11 +293,13 @@ const filteredProducts = products
                             </p>
                         </div>
                      ) : (
-                        currentProduct.map((product) => (
-                            <Link to={`/product-detail/${product.id}`} ><div
-                            key={product.id}
-                            className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 group cursor-pointer"
-                        >
+currentProduct.map((product) => (
+                            <Link
+                                key={product.id}
+                                to={`/product-detail/${product.id}`}
+                                className="block"
+                            >
+                                <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 group cursor-pointer">
 
                             <div className="h-56 bg-gray-100 overflow-hidden">
 
@@ -318,8 +345,8 @@ const filteredProducts = products
 
         <div className='flex items-center justify-center mt-7 gap-3'>
                {
-                   [...Array(totalPages)].map((_,index)=>(
-                      <button onClick={()=>setCurrentPage(index+1)} className={`w-10 h-10 rounded-2xl ${currentPage===index+1?"bg-indigo-600 text-white":"bg-gray-100"}`}>  
+[...Array(totalPages)].map((_,index)=>(
+                      <button key={index} onClick={()=>setCurrentPage(index+1)} className={`w-10 h-10 rounded-2xl ${currentPage===index+1?"bg-indigo-600 text-white":"bg-gray-100"}`}>
                           {index+1}
                       </button>
                     

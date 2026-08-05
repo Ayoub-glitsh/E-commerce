@@ -4,12 +4,10 @@ import Footer from './Footer';
 import Products from './Products';
 import { Routes, Route } from "react-router-dom";
 import ProductDetail from './ProductDetail';
-import { useEffect } from 'react';
 import Cart from './Cart';
 import WishList from './Wishlist';
 import { Toaster } from 'react-hot-toast';
 import Checkout from './Checkout';
-import useCartStore from './store/cartStore';
 import Chatbot from './Chatbot';
 import Orders from './Orders';
 import OrderDetail from './OrderDetail';
@@ -20,17 +18,6 @@ import ForgotPassword from './ForgotPassword';
 import ProtectedRoute from './ProtectedRoute';
 
 function App() {
-  const cart = useCartStore(state => state.cart);
-  const wish = useCartStore(state => state.wish);
-
-  useEffect(() => {
-    localStorage.setItem("cart", JSON.stringify(cart));
-  }, [cart]);
-
-  useEffect(() => {
-    localStorage.setItem("wish", JSON.stringify(wish));
-  }, [wish]);
-
   return (
     <div className="min-h-screen flex flex-col">
       <Toaster />

@@ -73,21 +73,44 @@ const {id}=useParams();
       setImage(index);
    }
  
-   useEffect(()=>{
+useEffect(()=>{
         async function loadProducts(){
              const response= await fetch("/api/products");
              const data = await response.json();
-             setProducts(data);
+
+             // La réponse peut venir soit du mock MSW (tableau direct),
+             // soit du backend réel ({ data: { products: [...] } }).
+             const rawList = Array.isArray(data)
+                 ? data
+                 : data?.data?.products ?? data?.products ?? [];
+
+             // Normalise les champs pour correspondre à l'affichage attendu.
+             // Ici image/l'array images est conservé (product.image[index]).
+             const normalized = rawList.map((product) => {
+                 const category =
+                     typeof product.category === "string"
+                         ? product.category
+                         : product.category?.name ?? "";
+
+                 const images = product.images ?? product.image ?? [];
+
+                 return {
+                     ...product,
+                     image: Array.isArray(images) ? images : [images],
+                     rating: product.rating ?? product.ratingAvg ?? 0,
+                     category,
+                     reviews: product.reviews ?? [],
+                 };
+             });
+
+             setProducts(normalized);
         }  
         loadProducts();
     },[])
   
 
-const product=products.find(p=>p.id===Number(id));
+const product=products.find(p=>String(p.id)===String(id));
 const wished=wish.some(item=>item.id===product?.id);
-const produitSimilaire = products.filter((p) => {
-    return p.category === product.category && p.id !== product.id;
-});
 if(products.length === 0){
     return <p>Chargement...</p>;
 }
@@ -95,6 +118,10 @@ if(products.length === 0){
 if(!product){
     return <p>Produit introuvable.</p>;
 }
+
+const produitSimilaire = products.filter((p) => {
+    return p.category === product.category && p.id !== product.id;
+});
 
 const totalReviews = product.reviews.length;
 const avgRating = totalReviews

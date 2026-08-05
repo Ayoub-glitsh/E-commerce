@@ -14,21 +14,29 @@ const WHY = [
 ]
 
 
-    useEffect(()=>{
+useEffect(()=>{
         async function loadCategories(){
-             const response = await fetch("/api/categories");
-             const data = await response.json();
-             setCategories(data);
+            try{
+                const response = await fetch("/api/categories");
+                const result = await response.json();
+                setCategories(result.data.categories || []);
+            }catch(error){
+                setCategories([]);
+            }
         }
         loadCategories();
     },[]);
 
-    useEffect(()=>{
+useEffect(()=>{
         async function loadProducts(){
-             const response= await fetch("/api/products");
-             const data = await response.json();
-             setProducts(data);
-        }  
+            try{
+                const response = await fetch("/api/products");
+                const result = await response.json();
+                setProducts(result.data.products || []);
+            }catch(error){
+                setProducts([]);
+            }
+        }
         loadProducts();
     },[])
 
@@ -66,7 +74,7 @@ const WHY = [
                       </p>
                       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-8">
                           {categories.map((category)=>(
-                              <Link to="/products"><div key={category.id} className="group bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-xl hover:border-indigo-100 hover:-translate-y-2 transition-all duration-300 cursor-pointer">
+<Link to="/products" key={category.id}><div className="group bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-xl hover:border-indigo-100 hover:-translate-y-2 transition-all duration-300 cursor-pointer">
                                 <div className="w-20 h-20 mx-auto overflow-hidden rounded-full bg-gray-100 ring-4 ring-transparent group-hover:ring-indigo-50 transition-all duration-300">
                                     <img src={category.image} alt={category.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"/>
                                </div>
@@ -103,8 +111,7 @@ const WHY = [
 
         {products.map((product) => (
 
-          <Link to={`/product-detail/${product.id}`}><div
-                key={product.id}
+<Link to={`/product-detail/${product.id}`} key={product.id}><div
                 className="bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-2xl hover:shadow-indigo-100 hover:border-indigo-200 transition-all duration-300 hover:-translate-y-2 group"
             >
 
