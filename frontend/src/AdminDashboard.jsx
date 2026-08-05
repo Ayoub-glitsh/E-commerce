@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   LayoutDashboard, ShoppingBag, Users, Settings, 
   TrendingUp, Package, DollarSign, Bell, Search, 
-  Sparkles, ArrowUpRight, MoreVertical, X, CheckCircle2 
+  Sparkles, ArrowUpRight, MoreVertical, X, CheckCircle2, ArrowUpDown, Loader2
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import useCartStore from './store/cartStore';
@@ -13,6 +13,15 @@ function AdminDashboard() {
   const [showNotifs, setShowNotifs] = useState(false);
   const notifRef = useRef(null);
 
+  // State pour la gestion des produits
+  const [products, setProducts] = useState([]);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+  const [productsError, setProductsError] = useState(null);
+  const [productSearch, setProductSearch] = useState('');
+  const [productSort, setProductSort] = useState('date-desc');
+  const [productsPerPage, setProductsPerPage] = useState(15);
+  const [productsCurrentPage, setProductsCurrentPage] = useState(1);
+
   const orders = useCartStore((state) => state.orders) || [];
 
   useEffect(() => {
@@ -20,13 +29,104 @@ function AdminDashboard() {
           try {
               const res = await fetch('/api/products');
               const data = await res.json();
-              setProductsCount(data.length);
+              // Correction du bug : data est { success, data: { products, stats } }
+              setProductsCount(data?.data?.products?.length ?? 0);
           } catch (error) {
               console.log(error);
           }
       }
       loadProducts();
   }, []);
+
+  // Fetch des produits admin (protégé JWT)
+  useEffect(() => {
+      if (activeTab !== 'products') return;
+
+      let cancelled = false;
+      async function loadAdminProducts() {
+          setIsLoadingProducts(true);
+          setProductsError(null);
+          try {
+              const token = localStorage.getItem('token');
+              const res = await fetch('/api/admin/products?includeInactive=true', {
+                  headers: {
+                      'Authorization': `Bearer ${token}`
+                  }
+              });
+              const data = await res.json();
+              if (!res.ok) {
+                  throw new Error(data?.message || 'Erreur lors de la récupération des produits');
+              }
+              if (!cancelled) {
+                  setProducts(data?.data?.products ?? []);
+              }
+          } catch (error) {
+              if (!cancelled) {
+                  setProductsError(error?.message || 'Impossible de charger les produits.');
+              }
+          } finally {
+              if (!cancelled) {
+                  setIsLoadingProducts(false);
+              }
+          }
+      }
+      loadAdminProducts();
+      return () => { cancelled = true; };
+  }, [activeTab]);
+
+  // Reset de la page quand la recherche ou le tri change
+  useEffect(() => {
+      setProductsCurrentPage(1);
+  }, [productSearch, productSort]);
+
+  // Indicateur de stock : vert/orange/rouge
+  const getStockIndicator = (stock) => {
+      if (stock > 10) return { color: 'green', label: 'En stock' };
+      if (stock >= 1 && stock <= 10) return { color: 'orange', label: 'Stock limité' };
+      return { color: 'red', label: 'Rupture de stock' };
+  };
+
+  // Produits filtrés (recherche) → triés → paginés
+  const processedProducts = useMemo(() => {
+      // 1. Recherche par nom (insensible à la casse)
+      let list = products;
+      if (productSearch.trim()) {
+          const q = productSearch.trim().toLowerCase();
+          list = list.filter(p => (p.name || '').toLowerCase().includes(q));
+      }
+
+      // 2. Tri
+      const sorted = [...list];
+      switch (productSort) {
+          case 'price-asc':
+              sorted.sort((a, b) => a.price - b.price);
+              break;
+          case 'price-desc':
+              sorted.sort((a, b) => b.price - a.price);
+              break;
+          case 'stock-asc':
+              sorted.sort((a, b) => a.stock - b.stock);
+              break;
+          case 'stock-desc':
+              sorted.sort((a, b) => b.stock - a.stock);
+              break;
+          case 'date-asc':
+              sorted.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+              break;
+          case 'date-desc':
+          default:
+              sorted.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+              break;
+      }
+
+      // 3. Pagination
+      const totalPages = Math.max(1, Math.ceil(sorted.length / productsPerPage));
+      const currentPage = Math.min(productsCurrentPage, totalPages);
+      const startIndex = (currentPage - 1) * productsPerPage;
+      const pageItems = sorted.slice(startIndex, startIndex + productsPerPage);
+
+      return { pageItems, total: sorted.length, totalPages, currentPage };
+  }, [products, productSearch, productSort, productsPerPage, productsCurrentPage]);
 
   useEffect(() => {
       function handleClickOutside(event) {
@@ -76,13 +176,16 @@ function AdminDashboard() {
           <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-colors ${activeTab === 'dashboard' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
             <LayoutDashboard size={20} /> Vue d'ensemble
           </button>
-          <button onClick={() => setActiveTab('orders')} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-colors ${activeTab === 'orders' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
+<button onClick={() => setActiveTab('orders')} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-colors ${activeTab === 'orders' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
             <ShoppingBag size={20} /> Commandes
             {pendingOrders.length > 0 && (
                 <span className="ml-auto bg-red-100 text-red-600 text-xs font-bold px-2 py-0.5 rounded-full">
                     {pendingOrders.length}
                 </span>
             )}
+          </button>
+          <button onClick={() => setActiveTab('products')} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-colors ${activeTab === 'products' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
+            <Package size={20} /> Produits
           </button>
         </nav>
       </aside>
@@ -329,6 +432,169 @@ function AdminDashboard() {
                         )}
                     </div>
                 </div>
+              </div>
+          )}
+
+{activeTab === 'products' && (
+              <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in">
+                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
+                  <div>
+                    <h1 className="text-2xl font-bold text-gray-900">Gestion des produits</h1>
+                    <p className="text-gray-500 text-sm mt-1">Recherchez, triez et gérez l'ensemble de votre catalogue.</p>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-3">
+                      <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                          <input 
+                              type="text" 
+                              value={productSearch}
+                              onChange={(e) => setProductSearch(e.target.value)}
+                              placeholder="Rechercher un produit..."
+                              className="pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-indigo-500 w-full sm:w-64 shadow-sm"
+                          />
+                      </div>
+                      <div className="relative">
+                          <ArrowUpDown className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                          <select
+                              value={productSort}
+                              onChange={(e) => setProductSort(e.target.value)}
+                              className="pl-10 pr-8 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-indigo-500 shadow-sm appearance-none cursor-pointer"
+                          >
+                              <option value="date-desc">Plus récents</option>
+                              <option value="date-asc">Plus anciens</option>
+                              <option value="price-desc">Prix décroissant</option>
+                              <option value="price-asc">Prix croissant</option>
+                              <option value="stock-desc">Stock décroissant</option>
+                              <option value="stock-asc">Stock croissant</option>
+                          </select>
+                      </div>
+                      <select
+                          value={productsPerPage}
+                          onChange={(e) => setProductsPerPage(Number(e.target.value))}
+                          className="px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-indigo-500 shadow-sm cursor-pointer"
+                      >
+                          <option value={10}>10 / page</option>
+                          <option value={15}>15 / page</option>
+                          <option value={20}>20 / page</option>
+                      </select>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                    <div className="overflow-x-auto">
+                        {isLoadingProducts ? (
+                            <div className="p-20 text-center flex flex-col items-center">
+                                <Loader2 size={40} className="text-indigo-500 animate-spin mb-4" />
+                                <h3 className="text-lg font-bold text-gray-900">Chargement des produits...</h3>
+                                <p className="text-gray-500 mt-2">Veuillez patienter.</p>
+                            </div>
+                        ) : productsError ? (
+                            <div className="p-20 text-center flex flex-col items-center">
+                                <X size={40} className="text-red-400 mb-4" />
+                                <h3 className="text-lg font-bold text-gray-900">Erreur de chargement</h3>
+                                <p className="text-gray-500 mt-2">{productsError}</p>
+                            </div>
+                        ) : processedProducts.pageItems.length === 0 ? (
+                            <div className="p-20 text-center flex flex-col items-center">
+                                <Package size={48} className="text-gray-300 mb-4" />
+                                <h3 className="text-xl font-bold text-gray-900">Aucun produit trouvé</h3>
+                                <p className="text-gray-500 mt-2">Aucun produit ne correspond à votre recherche.</p>
+                            </div>
+                        ) : (
+                            <table className="w-full text-left border-collapse">
+                              <thead>
+                                <tr className="bg-gray-50 border-b border-gray-100">
+                                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Produit</th>
+                                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Catégorie</th>
+                                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Prix</th>
+                                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Stock</th>
+                                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Statut</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100">
+                                {processedProducts.pageItems.map((product) => {
+                                    const indicator = getStockIndicator(product.stock);
+                                    const indicatorStyles = {
+                                        green: 'bg-green-100 text-green-700',
+                                        orange: 'bg-orange-100 text-orange-700',
+                                        red: 'bg-red-100 text-red-700'
+                                    };
+                                    return (
+                                        <tr key={product.id} className="hover:bg-gray-50/50 transition-colors">
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    {product.images && product.images.length > 0 ? (
+                                                        <img 
+                                                            src={product.images[0]} 
+                                                            alt={product.name}
+                                                            className="w-10 h-10 rounded-lg object-cover border border-gray-100 flex-shrink-0"
+                                                            onError={(e) => { e.target.style.display = 'none'; }}
+                                                        />
+                                                    ) : (
+                                                        <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                                                            <Package size={18} className="text-gray-400" />
+                                                        </div>
+                                                    )}
+                                                    <div className="min-w-0">
+                                                        <div className="text-sm font-semibold text-gray-900 truncate max-w-[220px]">{product.name}</div>
+                                                        <div className="text-xs text-gray-500 mt-0.5 truncate max-w-[220px]">{product.description || ''}</div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-sm text-gray-600">{product.category?.name || "Sans catégorie"}</td>
+                                            <td className="px-6 py-4 text-sm font-bold text-gray-900">{parseFloat(product.price).toFixed(2)} €</td>
+                                            <td className="px-6 py-4">
+                                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-full ${indicatorStyles[indicator.color]}`}>
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
+                                                    {indicator.label} ({product.stock})
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                {product.isActive ? (
+                                                    <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-700">Actif</span>
+                                                ) : (
+                                                    <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">Inactif</span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                              </tbody>
+                            </table>
+                        )}
+                    </div>
+                </div>
+
+                {!isLoadingProducts && !productsError && processedProducts.total > 0 && (
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <p className="text-sm text-gray-500">
+                            Affichage de <span className="font-semibold text-gray-900">{processedProducts.pageItems.length}</span> produits
+                            {productSearch.trim() && (
+                                <> • <span className="font-semibold text-gray-900">{processedProducts.total}</span> résultat(s) pour "<span className="text-indigo-600">{productSearch.trim()}</span>"</>
+                            )}
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setProductsCurrentPage(prev => Math.max(1, prev - 1))}
+                                disabled={processedProducts.currentPage <= 1}
+                                className="px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                                Précédent
+                            </button>
+                            <span className="px-4 py-2 text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl">
+                                Page {processedProducts.currentPage} / {processedProducts.totalPages}
+                            </span>
+                            <button
+                                onClick={() => setProductsCurrentPage(prev => Math.min(processedProducts.totalPages, prev + 1))}
+                                disabled={processedProducts.currentPage >= processedProducts.totalPages}
+                                className="px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                                Suivant
+                            </button>
+                        </div>
+                    </div>
+                )}
               </div>
           )}
 
