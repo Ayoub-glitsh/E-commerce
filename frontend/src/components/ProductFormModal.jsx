@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
-import { X, Plus, Loader2, ImagePlus, Trash2 } from 'lucide-react';
+import { X, Plus, Loader2, ImagePlus, Trash2, Sparkles } from 'lucide-react';
 
 /**
  * Schéma de validation Zod reprenant les règles du backend
@@ -33,6 +33,7 @@ function ProductFormModal({ isOpen, onClose, product, onSuccess }) {
   const [images, setImages] = useState([]);           // URLs uploadées
   const [uploading, setUploading] = useState(false);  // état upload en cours
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
   const [tags, setTags] = useState([]);               // liste des tags (chips)
   const [tagInput, setTagInput] = useState('');
 
@@ -40,6 +41,8 @@ function ProductFormModal({ isOpen, onClose, product, onSuccess }) {
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors }
   } = useForm({
     resolver: zodResolver(productSchema),
@@ -150,7 +153,7 @@ function ProductFormModal({ isOpen, onClose, product, onSuccess }) {
     }
   }
 
-  // Supprimer une image de la liste (avant envoi)
+// Supprimer une image de la liste (avant envoi)
   function removeImage(url) {
     setImages(prev => prev.filter(img => img !== url));
   }
@@ -179,6 +182,45 @@ function ProductFormModal({ isOpen, onClose, product, onSuccess }) {
 
   function removeTag(tag) {
     setTags(prev => prev.filter(t => t !== tag));
+  }
+
+  /**
+   * Génère une description produit via le backend chatbot IA (POST /ai/generate-description)
+   * puis remplit le textarea description (valeur éditable).
+   */
+  async function handleGenerateDescription() {
+    const name = (watch('name') || '').trim();
+    const categoryId = watch('categoryId');
+    const selectedCategory = categories.find(cat => cat.id === categoryId);
+    const category = selectedCategory?.name?.trim() || '';
+
+    if (!name || !category) {
+      toast.error('Veuillez renseigner le nom et la catégorie avant de générer une description.');
+      return;
+    }
+
+    setIsGeneratingDescription(true);
+    try {
+      const res = await fetch('http://localhost:5000/ai/generate-description', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ name, category, tags })
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || 'Impossible de générer la description.');
+      }
+
+      setValue('description', data.description || '', { shouldValidate: true });
+      toast.success('Description générée avec succès. Vous pouvez la modifier avant d\'enregistrer.');
+    } catch (error) {
+      toast.error(error?.message || 'Impossible de générer la description.');
+    } finally {
+      setIsGeneratingDescription(false);
+    }
   }
 
   /**
@@ -267,9 +309,29 @@ function ProductFormModal({ isOpen, onClose, product, onSuccess }) {
               {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name.message}</p>}
             </div>
 
-            {/* Description */}
+{/* Description */}
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Description</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-sm font-medium text-gray-700">Description</label>
+                <button
+                  type="button"
+                  onClick={handleGenerateDescription}
+                  disabled={isGeneratingDescription}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isGeneratingDescription ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      Génération...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={14} />
+                      Générer description
+                    </>
+                  )}
+                </button>
+              </div>
               <textarea
                 rows={3}
                 placeholder="Description détaillée du produit..."
