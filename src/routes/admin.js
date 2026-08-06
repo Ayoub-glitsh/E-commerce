@@ -1,5 +1,6 @@
 const express = require('express');
 const AdminProductController = require('../controllers/adminProductController');
+const AdminCategoryController = require('../controllers/adminCategoryController');
 const UploadController = require('../controllers/uploadController');
 const { upload } = require('../config/multer');
 const { verifyToken, verifyAdmin } = require('../middleware/auth');
@@ -71,5 +72,49 @@ router.post(
   upload.single('image'),
   UploadController.uploadProductImage
 );
+
+/**
+ * @route   GET /api/admin/categories
+ * @desc    Liste toutes les catégories avec le nombre de produits
+ * @access  Admin only
+ * @returns { categories: [{ id, name, description, createdAt, updatedAt, productCount }] }
+ */
+router.get('/categories', AdminCategoryController.getCategories);
+
+/**
+ * @route   POST /api/admin/categories
+ * @desc    Créer une nouvelle catégorie
+ * @access  Admin only
+ * @body    { name, description? }
+ * @returns { category } avec status 201
+ */
+router.post(
+  '/categories',
+  AdminCategoryController.validateCreateCategory,
+  AdminCategoryController.createCategory
+);
+
+/**
+ * @route   PUT /api/admin/categories/:id
+ * @desc    Modifier une catégorie existante
+ * @access  Admin only
+ * @params  { id: UUID }
+ * @body    { name?, description? }
+ * @returns { category }
+ */
+router.put(
+  '/categories/:id',
+  AdminCategoryController.validateUpdateCategory,
+  AdminCategoryController.updateCategory
+);
+
+/**
+ * @route   DELETE /api/admin/categories/:id
+ * @desc    Supprimer une catégorie (bloquée si des produits y sont liés)
+ * @access  Admin only
+ * @params  { id: UUID }
+ * @returns { message, deletedCategory } avec status 200, ou 409 si des produits sont liés
+ */
+router.delete('/categories/:id', AdminCategoryController.deleteCategory);
 
 module.exports = router;

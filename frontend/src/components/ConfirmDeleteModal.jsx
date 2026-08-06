@@ -1,16 +1,31 @@
 import { Loader2, Trash2, X } from 'lucide-react';
-import toast from 'react-hot-toast';
 
 /**
- * Modal de confirmation de suppression d'un produit.
- * - isOpen      : booléen, contrôle l'affichage
- * - product     : objet produit à supprimer (ou null)
- * - isDeleting  : booléen, état de chargement pendant l'appel API
- * - onClose     : ferme la modal sans action
- * - onConfirm   : déclenche la suppression effective
+ * Modal de confirmation de suppression générique (réutilisable).
+ *
+ * - isOpen            : booléen, contrôle l'affichage
+ * - title             : titre de la modal (défaut : "Supprimer ?")
+ * - entityName        : texte affiché dans le message principal (ex. "ce produit")
+ * - entityLabel       : libellé du nom de l'entité (ex. "« produit »")
+ * - message           : message libre (optionnel) à afficher après le nom
+ * - warning           : avertissement (optionnel) affiché en rouge
+ * - confirmDisabled   : désactive le bouton de confirmation (ex. si suppression bloquée)
+ * - isDeleting        : booléen, état de chargement pendant l'appel API
+ * - onClose           : ferme la modal sans action
+ * - onConfirm         : déclenche la suppression effective
  */
-function ConfirmDeleteModal({ isOpen, product, isDeleting, onClose, onConfirm }) {
-  if (!isOpen || !product) return null;
+function ConfirmDeleteModal({
+  isOpen,
+  title = 'Supprimer ?',
+  entityName = '',
+  message = '',
+  warning = '',
+  confirmDisabled = false,
+  isDeleting = false,
+  onClose,
+  onConfirm
+}) {
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -35,13 +50,18 @@ function ConfirmDeleteModal({ isOpen, product, isDeleting, onClose, onConfirm })
 
         {/* Corps */}
         <div className="px-6 pt-4">
-          <h2 className="text-lg font-bold text-gray-900">Supprimer ce produit ?</h2>
+          <h2 className="text-lg font-bold text-gray-900">{title}</h2>
           <p className="mt-2 text-sm text-gray-600">
-            Vous êtes sur le point de supprimer <span className="font-semibold text-gray-900">« {product.name} »</span> du catalogue.
+            {message || (
+              <>
+                Êtes-vous sûr de vouloir supprimer{' '}
+                <span className="font-semibold text-gray-900">{entityName}</span> ?
+              </>
+            )}
           </p>
-          <p className="mt-2 text-sm text-red-600 font-medium">
-            Cette action est irréversible. Le produit sera définitivement supprimé du catalogue.
-          </p>
+          {warning && (
+            <p className="mt-2 text-sm text-red-600 font-medium">{warning}</p>
+          )}
         </div>
 
         {/* Boutons d'action */}
@@ -57,8 +77,12 @@ function ConfirmDeleteModal({ isOpen, product, isDeleting, onClose, onConfirm })
           <button
             type="button"
             onClick={onConfirm}
-            disabled={isDeleting}
-            className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isDeleting || confirmDisabled}
+            className={`inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white rounded-xl transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+              confirmDisabled && !isDeleting
+                ? 'bg-gray-400 hover:bg-gray-400'
+                : 'bg-red-600 hover:bg-red-700'
+            }`}
           >
             {isDeleting ? (
               <>

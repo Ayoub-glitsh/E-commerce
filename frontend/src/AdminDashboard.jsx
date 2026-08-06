@@ -3,11 +3,12 @@ import toast from 'react-hot-toast';
 import { 
   LayoutDashboard, ShoppingBag, Users, Settings, 
   TrendingUp, Package, DollarSign, Bell, Search, 
-  Sparkles, ArrowUpRight, MoreVertical, X, CheckCircle2, ArrowUpDown, Loader2, Plus, Pencil, Trash2
+  Sparkles, ArrowUpRight, MoreVertical, X, CheckCircle2, ArrowUpDown, Loader2, Plus, Pencil, Trash2, Tag, FolderTree
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import useCartStore from './store/cartStore';
 import ProductFormModal from './components/ProductFormModal';
+import CategoryFormModal from './components/CategoryFormModal';
 import ConfirmDeleteModal from './components/ConfirmDeleteModal';
 
 function AdminDashboard() {
@@ -29,9 +30,22 @@ function AdminDashboard() {
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
 
-  // State du modal de confirmation de suppression
+// State du modal de confirmation de suppression
   const [deleteConfirmProduct, setDeleteConfirmProduct] = useState(null);
   const [isDeletingProduct, setIsDeletingProduct] = useState(false);
+
+// State pour la gestion des catégories
+  const [categories, setCategories] = useState([]);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(false);
+  const [categoriesError, setCategoriesError] = useState(null);
+
+// State du modal catégorie (création / édition)
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState(null);
+
+  // State du modal de confirmation de suppression de catégorie
+  const [deleteConfirmCategory, setDeleteConfirmCategory] = useState(null);
+  const [isDeletingCategory, setIsDeletingCategory] = useState(false);
 
   const orders = useCartStore((state) => state.orders) || [];
 
@@ -135,10 +149,92 @@ function AdminDashboard() {
       return () => { cancelled = true; };
   }, [activeTab]);
 
-  // Reset de la page quand la recherche ou le tri change
+// Reset de la page quand la recherche ou le tri change
   useEffect(() => {
       setProductsCurrentPage(1);
   }, [productSearch, productSort]);
+
+  // Rafraîchir la liste des catégories (après création/édition/suppression)
+  async function refreshCategories() {
+      try {
+          const token = localStorage.getItem('token');
+          const res = await fetch('/api/admin/categories', {
+              headers: {
+                  'Authorization': `Bearer ${token}`
+              }
+          });
+          const data = await res.json();
+          if (res.ok) {
+              setCategories(data?.data?.categories ?? []);
+          }
+      } catch (error) {
+          console.log('Erreur lors du rafraîchissement des catégories:', error);
+      }
+  }
+
+  // Suppression d'une catégorie (appelé depuis la modal de confirmation)
+  async function handleDeleteCategory() {
+      if (!deleteConfirmCategory) return;
+      setIsDeletingCategory(true);
+      try {
+          const token = localStorage.getItem('token');
+          const res = await fetch(`/api/admin/categories/${deleteConfirmCategory.id}`, {
+              method: 'DELETE',
+              headers: {
+                  'Authorization': `Bearer ${token}`
+              }
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+              throw new Error(data?.message || 'Erreur lors de la suppression de la catégorie');
+          }
+          toast.success('Catégorie supprimée avec succès');
+          // Fermer la modal et réinitialiser l'état
+          setDeleteConfirmCategory(null);
+          // Recharger la liste à jour
+          await refreshCategories();
+      } catch (error) {
+          toast.error(error?.message || 'Erreur lors de la suppression de la catégorie');
+      } finally {
+          setIsDeletingCategory(false);
+      }
+  }
+
+  // Fetch des catégories admin (protégé JWT)
+  useEffect(() => {
+      if (activeTab !== 'categories') return;
+
+      let cancelled = false;
+      async function loadAdminCategories() {
+          setIsLoadingCategories(true);
+          setCategoriesError(null);
+          try {
+              const token = localStorage.getItem('token');
+              const res = await fetch('/api/admin/categories', {
+                  headers: {
+                      'Authorization': `Bearer ${token}`
+                  }
+              });
+              const data = await res.json();
+              if (!res.ok) {
+                  throw new Error(data?.message || 'Erreur lors de la récupération des catégories');
+              }
+              if (!cancelled) {
+                  setCategories(data?.data?.categories ?? []);
+              }
+          } catch (error) {
+              if (!cancelled) {
+                  setCategoriesError(error?.message || 'Impossible de charger les catégories.');
+              }
+          } finally {
+              if (!cancelled) {
+                  setIsLoadingCategories(false);
+              }
+          }
+      }
+      loadAdminCategories();
+      return () => { cancelled = true; };
+  }, [activeTab]);
 
   // Indicateur de stock : vert/orange/rouge
   const getStockIndicator = (stock) => {
@@ -245,8 +341,11 @@ function AdminDashboard() {
                 </span>
             )}
           </button>
-          <button onClick={() => setActiveTab('products')} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-colors ${activeTab === 'products' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
+<button onClick={() => setActiveTab('products')} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-colors ${activeTab === 'products' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
             <Package size={20} /> Produits
+          </button>
+          <button onClick={() => setActiveTab('categories')} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-colors ${activeTab === 'categories' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
+            <FolderTree size={20} /> Catégories
           </button>
         </nav>
       </aside>
@@ -687,6 +786,116 @@ function AdminDashboard() {
                             </button>
                         </div>
                     </div>
+)}
+              </div>
+          )}
+
+{activeTab === 'categories' && (
+              <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in">
+                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
+                  <div>
+                    <h1 className="text-2xl font-bold text-gray-900">Gestion des catégories</h1>
+                    <p className="text-gray-500 text-sm mt-1">Créez, renommez et organisez vos catégories de produits.</p>
+                  </div>
+                  
+                  <button
+                      onClick={() => {
+                          setEditingCategory(null);
+                          setCategoryModalOpen(true);
+                      }}
+                      className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-colors shadow-sm"
+                  >
+                      <Plus size={16} />
+                      Ajouter une catégorie
+                  </button>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                    <div className="overflow-x-auto">
+                        {isLoadingCategories ? (
+                            <div className="p-20 text-center flex flex-col items-center">
+                                <Loader2 size={40} className="text-indigo-500 animate-spin mb-4" />
+                                <h3 className="text-lg font-bold text-gray-900">Chargement des catégories...</h3>
+                                <p className="text-gray-500 mt-2">Veuillez patienter.</p>
+                            </div>
+                        ) : categoriesError ? (
+                            <div className="p-20 text-center flex flex-col items-center">
+                                <X size={40} className="text-red-400 mb-4" />
+                                <h3 className="text-lg font-bold text-gray-900">Erreur de chargement</h3>
+                                <p className="text-gray-500 mt-2">{categoriesError}</p>
+                            </div>
+                        ) : categories.length === 0 ? (
+                            <div className="p-20 text-center flex flex-col items-center">
+                                <FolderTree size={48} className="text-gray-300 mb-4" />
+                                <h3 className="text-xl font-bold text-gray-900">Aucune catégorie</h3>
+                                <p className="text-gray-500 mt-2">Commencez par ajouter une catégorie.</p>
+                            </div>
+                        ) : (
+                            <table className="w-full text-left border-collapse">
+                              <thead>
+                                <tr className="bg-gray-50 border-b border-gray-100">
+                                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Nom</th>
+                                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Description</th>
+                                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Nombre de produits</th>
+                                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100">
+                                {categories.map((cat) => (
+                                  <tr key={cat.id} className="hover:bg-gray-50/50 transition-colors">
+                                    <td className="px-6 py-4">
+                                      <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center flex-shrink-0">
+                                          <Tag size={18} className="text-indigo-600" />
+                                        </div>
+                                        <div className="text-sm font-semibold text-gray-900">{cat.name}</div>
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-sm text-gray-600 max-w-[300px] truncate">{cat.description || '—'}</td>
+                                    <td className="px-6 py-4">
+                                      {cat.productCount > 0 ? (
+                                          <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-700">
+                                              {cat.productCount} produit{cat.productCount > 1 ? 's' : ''}
+                                          </span>
+                                      ) : (
+                                          <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-500">
+                                              0 produit
+                                          </span>
+                                      )}
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                      <div className="flex justify-end gap-2">
+                                        <button
+                                            onClick={() => {
+                                                setEditingCategory(cat);
+                                                setCategoryModalOpen(true);
+                                            }}
+                                            className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors"
+                                        >
+                                            <Pencil size={14} />
+                                            Modifier
+                                        </button>
+                                        <button
+                                            onClick={() => setDeleteConfirmCategory(cat)}
+                                            className="inline-flex items-center gap-1.5 text-sm font-medium text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors"
+                                        >
+                                            <Trash2 size={14} />
+                                            Supprimer
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                        )}
+                    </div>
+                </div>
+
+                {!isLoadingCategories && !categoriesError && categories.length > 0 && (
+                    <p className="text-sm text-gray-500">
+                        Affichage de <span className="font-semibold text-gray-900">{categories.length}</span> catégorie(s)
+                    </p>
                 )}
               </div>
           )}
@@ -702,13 +911,54 @@ function AdminDashboard() {
         onSuccess={refreshProducts}
       />
 
-      {/* Modal de confirmation de suppression */}
+      {/* Modal de confirmation de suppression de produit */}
       <ConfirmDeleteModal
         isOpen={!!deleteConfirmProduct}
-        product={deleteConfirmProduct}
+        title="Supprimer ce produit ?"
+        entityName={`« ${deleteConfirmProduct?.name || ''} »`}
+        message={
+          <>
+            Vous êtes sur le point de supprimer{' '}
+            <span className="font-semibold text-gray-900">« {deleteConfirmProduct?.name || ''} »</span> du catalogue.
+          </>
+        }
+        warning="Cette action est irréversible. Le produit sera définitivement supprimé du catalogue."
         isDeleting={isDeletingProduct}
         onClose={() => setDeleteConfirmProduct(null)}
         onConfirm={handleDeleteProduct}
+      />
+
+      {/* Modal de création / édition de catégorie */}
+      <CategoryFormModal
+        isOpen={categoryModalOpen}
+        onClose={() => setCategoryModalOpen(false)}
+        category={editingCategory}
+        onSuccess={refreshCategories}
+      />
+
+      {/* Modal de confirmation de suppression de catégorie */}
+      <ConfirmDeleteModal
+        isOpen={!!deleteConfirmCategory}
+        title="Supprimer cette catégorie ?"
+        entityName={deleteConfirmCategory?.name || ''}
+        message={
+          deleteConfirmCategory && deleteConfirmCategory.productCount > 0 ? (
+            `Cette catégorie contient ${deleteConfirmCategory.productCount} produit(s). La suppression est impossible tant que des produits y sont rattachés. Veuillez d'abord réassigner ou supprimer ces produits.`
+          ) : (
+            `Êtes-vous sûr de vouloir supprimer la catégorie « ${deleteConfirmCategory?.name || ''} » ?`
+          )
+        }
+        warning={
+          deleteConfirmCategory && deleteConfirmCategory.productCount > 0
+            ? 'Suppression impossible : des produits sont liés à cette catégorie.'
+            : 'Cette action est irréversible.'
+        }
+        confirmDisabled={
+          !!(deleteConfirmCategory && deleteConfirmCategory.productCount > 0)
+        }
+        isDeleting={isDeletingCategory}
+        onClose={() => setDeleteConfirmCategory(null)}
+        onConfirm={handleDeleteCategory}
       />
     </div>
   );
