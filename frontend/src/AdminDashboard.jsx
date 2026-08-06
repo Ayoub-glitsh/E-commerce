@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import toast from 'react-hot-toast';
 import { 
   LayoutDashboard, ShoppingBag, Users, Settings, 
   TrendingUp, Package, DollarSign, Bell, Search, 
-  Sparkles, ArrowUpRight, MoreVertical, X, CheckCircle2, ArrowUpDown, Loader2, Plus, Pencil
+  Sparkles, ArrowUpRight, MoreVertical, X, CheckCircle2, ArrowUpDown, Loader2, Plus, Pencil, Trash2
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import useCartStore from './store/cartStore';
 import ProductFormModal from './components/ProductFormModal';
+import ConfirmDeleteModal from './components/ConfirmDeleteModal';
 
 function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -23,9 +25,13 @@ function AdminDashboard() {
   const [productsPerPage, setProductsPerPage] = useState(15);
   const [productsCurrentPage, setProductsCurrentPage] = useState(1);
 
-  // State du modal produit (création / édition)
+// State du modal produit (création / édition)
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+
+  // State du modal de confirmation de suppression
+  const [deleteConfirmProduct, setDeleteConfirmProduct] = useState(null);
+  const [isDeletingProduct, setIsDeletingProduct] = useState(false);
 
   const orders = useCartStore((state) => state.orders) || [];
 
@@ -42,8 +48,40 @@ function AdminDashboard() {
           if (res.ok) {
               setProducts(data?.data?.products ?? []);
           }
-      } catch (error) {
+} catch (error) {
           console.log('Erreur lors du rafraîchissement des produits:', error);
+      }
+  }
+
+  // Suppression d'un produit (appelé depuis la modal de confirmation)
+  async function handleDeleteProduct() {
+      if (!deleteConfirmProduct) return;
+      setIsDeletingProduct(true);
+      try {
+          const token = localStorage.getItem('token');
+          const res = await fetch(`/api/admin/products/${deleteConfirmProduct.id}`, {
+              method: 'DELETE',
+              headers: {
+                  'Authorization': `Bearer ${token}`
+              }
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+              throw new Error(data?.message || 'Erreur lors de la suppression du produit');
+          }
+          toast.success('Produit supprimé avec succès');
+          // Fermer la modal et réinitialiser l'état
+          setDeleteConfirmProduct(null);
+          // Recharger la liste à jour
+          await refreshProducts();
+          // Si la page courante devient vide après suppression, revenir à la page précédente
+          if (processedProducts.pageItems.length === 1 && productsCurrentPage > 1) {
+              setProductsCurrentPage(prev => Math.max(1, prev - 1));
+          }
+      } catch (error) {
+          toast.error(error?.message || 'Erreur lors de la suppression du produit');
+      } finally {
+          setIsDeletingProduct(false);
       }
   }
 
@@ -591,17 +629,26 @@ function AdminDashboard() {
                                                     <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">Inactif</span>
                                                 )}
                                             </td>
-                                            <td className="px-6 py-4 text-right">
-                                              <button
-                                                  onClick={() => {
-                                                      setEditingProduct(product);
-                                                      setProductModalOpen(true);
-                                                  }}
-                                                  className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors"
-                                              >
-                                                  <Pencil size={14} />
-                                                  Modifier
-                                              </button>
+<td className="px-6 py-4 text-right">
+                                              <div className="flex justify-end gap-2">
+                                                <button
+                                                    onClick={() => {
+                                                        setEditingProduct(product);
+                                                        setProductModalOpen(true);
+                                                    }}
+                                                    className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors"
+                                                >
+                                                    <Pencil size={14} />
+                                                    Modifier
+                                                </button>
+                                                <button
+                                                    onClick={() => setDeleteConfirmProduct(product)}
+                                                    className="inline-flex items-center gap-1.5 text-sm font-medium text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors"
+                                                >
+                                                    <Trash2 size={14} />
+                                                    Supprimer
+                                                </button>
+                                              </div>
                                             </td>
                                         </tr>
                                     );
@@ -647,12 +694,21 @@ function AdminDashboard() {
 </div>
       </main>
 
-      {/* Modal de création / édition de produit */}
+{/* Modal de création / édition de produit */}
       <ProductFormModal
         isOpen={productModalOpen}
         onClose={() => setProductModalOpen(false)}
         product={editingProduct}
         onSuccess={refreshProducts}
+      />
+
+      {/* Modal de confirmation de suppression */}
+      <ConfirmDeleteModal
+        isOpen={!!deleteConfirmProduct}
+        product={deleteConfirmProduct}
+        isDeleting={isDeletingProduct}
+        onClose={() => setDeleteConfirmProduct(null)}
+        onConfirm={handleDeleteProduct}
       />
     </div>
   );
