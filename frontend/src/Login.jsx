@@ -14,8 +14,17 @@ function Login() {
     const [showPassword, setShowPassword] = useState(false);
     const [localErrors, setLocalErrors] = useState({});
 
+    const redirectAfterAuth = () => {
+        const user = useAuth.getState().user;
+        if (user?.role === 'admin') {
+            navigate('/admin', { replace: true });
+        } else {
+            navigate(from, { replace: true });
+        }
+    };
+
     useEffect(() => {
-        if (isAuthenticated) navigate(from, { replace: true });
+        if (isAuthenticated) redirectAfterAuth();
     }, [isAuthenticated]);
 
     useEffect(() => {
@@ -42,7 +51,7 @@ function Login() {
 
         const success = await login(form.email, form.password);
         if (success) {
-            navigate(from, { replace: true });
+            redirectAfterAuth();
         }
     };
 
