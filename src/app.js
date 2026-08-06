@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 
 // Importation des routes
 const authRoutes = require('./routes/auth');
@@ -40,6 +41,9 @@ app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
   next();
 });
+
+// Servir les fichiers uploadés (images de produits) en statique
+app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
 
 /**
  * Configuration des routes principales

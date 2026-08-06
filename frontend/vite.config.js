@@ -6,10 +6,14 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
 
-  // Proxy toutes les requêtes /api vers le backend Node.js (port 3000)
+// Proxy toutes les requêtes /api vers le backend Node.js (port 3000)
   server: {
     proxy: {
       '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+      '/uploads': {
         target: 'http://localhost:3000',
         changeOrigin: true,
       },

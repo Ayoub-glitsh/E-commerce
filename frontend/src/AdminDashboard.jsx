@@ -2,10 +2,11 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   LayoutDashboard, ShoppingBag, Users, Settings, 
   TrendingUp, Package, DollarSign, Bell, Search, 
-  Sparkles, ArrowUpRight, MoreVertical, X, CheckCircle2, ArrowUpDown, Loader2
+  Sparkles, ArrowUpRight, MoreVertical, X, CheckCircle2, ArrowUpDown, Loader2, Plus, Pencil
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import useCartStore from './store/cartStore';
+import ProductFormModal from './components/ProductFormModal';
 
 function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -13,7 +14,7 @@ function AdminDashboard() {
   const [showNotifs, setShowNotifs] = useState(false);
   const notifRef = useRef(null);
 
-  // State pour la gestion des produits
+// State pour la gestion des produits
   const [products, setProducts] = useState([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const [productsError, setProductsError] = useState(null);
@@ -22,7 +23,29 @@ function AdminDashboard() {
   const [productsPerPage, setProductsPerPage] = useState(15);
   const [productsCurrentPage, setProductsCurrentPage] = useState(1);
 
+  // State du modal produit (création / édition)
+  const [productModalOpen, setProductModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
+
   const orders = useCartStore((state) => state.orders) || [];
+
+  // Rafraîchir la liste des produits (après création/édition)
+  async function refreshProducts() {
+      try {
+          const token = localStorage.getItem('token');
+          const res = await fetch('/api/admin/products?includeInactive=true', {
+              headers: {
+                  'Authorization': `Bearer ${token}`
+              }
+          });
+          const data = await res.json();
+          if (res.ok) {
+              setProducts(data?.data?.products ?? []);
+          }
+      } catch (error) {
+          console.log('Erreur lors du rafraîchissement des produits:', error);
+      }
+  }
 
   useEffect(() => {
       async function loadProducts() {
@@ -469,7 +492,7 @@ function AdminDashboard() {
                               <option value="stock-asc">Stock croissant</option>
                           </select>
                       </div>
-                      <select
+<select
                           value={productsPerPage}
                           onChange={(e) => setProductsPerPage(Number(e.target.value))}
                           className="px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-indigo-500 shadow-sm cursor-pointer"
@@ -478,6 +501,16 @@ function AdminDashboard() {
                           <option value={15}>15 / page</option>
                           <option value={20}>20 / page</option>
                       </select>
+                      <button
+                          onClick={() => {
+                              setEditingProduct(null);
+                              setProductModalOpen(true);
+                          }}
+                          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-colors shadow-sm"
+                      >
+                          <Plus size={16} />
+                          Ajouter un produit
+                      </button>
                   </div>
                 </div>
 
@@ -505,11 +538,12 @@ function AdminDashboard() {
                             <table className="w-full text-left border-collapse">
                               <thead>
                                 <tr className="bg-gray-50 border-b border-gray-100">
-                                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Produit</th>
+<th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Produit</th>
                                   <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Catégorie</th>
                                   <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Prix</th>
                                   <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Stock</th>
                                   <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Statut</th>
+                                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-gray-100">
@@ -550,12 +584,24 @@ function AdminDashboard() {
                                                     {indicator.label} ({product.stock})
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4">
+<td className="px-6 py-4">
                                                 {product.isActive ? (
                                                     <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-700">Actif</span>
                                                 ) : (
                                                     <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">Inactif</span>
                                                 )}
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                              <button
+                                                  onClick={() => {
+                                                      setEditingProduct(product);
+                                                      setProductModalOpen(true);
+                                                  }}
+                                                  className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors"
+                                              >
+                                                  <Pencil size={14} />
+                                                  Modifier
+                                              </button>
                                             </td>
                                         </tr>
                                     );
@@ -598,8 +644,16 @@ function AdminDashboard() {
               </div>
           )}
 
-        </div>
+</div>
       </main>
+
+      {/* Modal de création / édition de produit */}
+      <ProductFormModal
+        isOpen={productModalOpen}
+        onClose={() => setProductModalOpen(false)}
+        product={editingProduct}
+        onSuccess={refreshProducts}
+      />
     </div>
   );
 }

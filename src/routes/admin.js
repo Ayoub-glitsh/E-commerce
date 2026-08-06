@@ -1,5 +1,7 @@
 const express = require('express');
 const AdminProductController = require('../controllers/adminProductController');
+const UploadController = require('../controllers/uploadController');
+const { upload } = require('../config/multer');
 const { verifyToken, verifyAdmin } = require('../middleware/auth');
 
 const router = express.Router();
@@ -57,5 +59,17 @@ router.put('/products/:id',
  * @returns { message, deletedProduct }
  */
 router.delete('/products/:id', AdminProductController.deleteProduct);
+
+/**
+ * @route   POST /api/admin/products/upload-image
+ * @desc    Uploader une image de produit (multipart/form-data, champ "image")
+ * @access  Admin only
+ * @returns { url } avec status 200
+ */
+router.post(
+  '/products/upload-image',
+  upload.single('image'),
+  UploadController.uploadProductImage
+);
 
 module.exports = router;
