@@ -1,6 +1,7 @@
 const express = require('express');
 const AdminProductController = require('../controllers/adminProductController');
 const AdminCategoryController = require('../controllers/adminCategoryController');
+const AdminOrderController = require('../controllers/adminOrderController');
 const UploadController = require('../controllers/uploadController');
 const { upload } = require('../config/multer');
 const { verifyToken, verifyAdmin } = require('../middleware/auth');
@@ -116,5 +117,34 @@ router.put(
  * @returns { message, deletedCategory } avec status 200, ou 409 si des produits sont liés
  */
 router.delete('/categories/:id', AdminCategoryController.deleteCategory);
+
+/**
+ * @route   GET /api/admin/orders
+ * @desc    Liste toutes les commandes de tous les utilisateurs (FonctionnalitéHaute#427)
+ * @access  Admin only
+ * @query   { status?, startDate?, endDate?, userId?, userEmail?, page?, limit? }
+ * @returns { success, data: { orders: [], pagination: { page, limit, total, totalPages } } }
+ */
+router.get('/orders', AdminOrderController.getAllOrders);
+
+/**
+ * @route   GET /api/admin/orders/:orderId
+ * @desc    Détail complet d'une commande (accès admin, sans filtre userId) (FonctionnalitéHaute#427)
+ * @access  Admin only
+ * @params  { orderId: string }
+ * @returns { success, data: { orderId, status, totalAmount, items, shippingAddress,
+ *            billingAddress, paymentMethod, trackingNumber, notes, user, createdAt, ... } }
+ */
+router.get('/orders/:orderId', AdminOrderController.getOrderByIdAdmin);
+
+/**
+ * @route   PUT /api/admin/orders/:orderId/status
+ * @desc    Changer le statut de N'IMPORTE QUELLE commande (FonctionnalitéHaute#427)
+ * @access  Admin only
+ * @params  { orderId: string }
+ * @body    { newStatus: "pending"|"confirmed"|"shipped"|"delivered"|"canceled" }
+ * @returns { success, data: { orderId, previousStatus, currentStatus, availableTransitions, ... } }
+ */
+router.put('/orders/:orderId/status', AdminOrderController.updateOrderStatusAdmin);
 
 module.exports = router;

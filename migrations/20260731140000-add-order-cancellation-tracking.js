@@ -71,13 +71,13 @@ module.exports = {
 
       // Supprimer l'ancien type ENUM
       await queryInterface.sequelize.query(
-        `DROP TYPE "OrderStatus"`,
+        `DROP TYPE "enum_orders_status"`,
         { transaction }
       );
 
       // Renommer le nouveau type pour remplacer l'ancien
       await queryInterface.sequelize.query(
-        `ALTER TYPE "OrderStatus_new" RENAME TO "OrderStatus"`,
+        `ALTER TYPE "OrderStatus_new" RENAME TO "enum_orders_status"`,
         { transaction }
       );
 
@@ -144,12 +144,12 @@ module.exports = {
       );
 
       await queryInterface.sequelize.query(
-        `DROP TYPE "OrderStatus"`,
+        `DROP TYPE "enum_orders_status"`,
         { transaction }
       );
 
       await queryInterface.sequelize.query(
-        `ALTER TYPE "OrderStatus_old" RENAME TO "OrderStatus"`,
+        `ALTER TYPE "OrderStatus_old" RENAME TO "enum_orders_status"`,
         { transaction }
       );
 
