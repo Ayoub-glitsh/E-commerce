@@ -3,11 +3,12 @@ import toast from 'react-hot-toast';
 import { 
   LayoutDashboard, ShoppingBag, Users, Settings, 
   TrendingUp, Package, DollarSign, Bell, Search, 
-  Sparkles, ArrowUpRight, MoreVertical, X, CheckCircle2, ArrowUpDown, Loader2, Plus, Pencil, Trash2, Tag, FolderTree,
-  Eye, Calendar, RefreshCw, MapPin, CreditCard, Truck, Filter
+Sparkles, ArrowUpRight, MoreVertical, X, CheckCircle2, ArrowUpDown, Loader2, Plus, Pencil, Trash2, Tag, FolderTree,
+  Eye, Calendar, RefreshCw, MapPin, CreditCard, Truck, Filter, Power, RotateCcw, UserCheck
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import useCartStore from './store/cartStore';
+import useAuth from './store/useAuth';
 import ProductFormModal from './components/ProductFormModal';
 import CategoryFormModal from './components/CategoryFormModal';
 import ConfirmDeleteModal from './components/ConfirmDeleteModal';
@@ -44,9 +45,35 @@ function AdminDashboard() {
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
 
-  // State du modal de confirmation de suppression de catégorie
+// State du modal de confirmation de suppression de catégorie
   const [deleteConfirmCategory, setDeleteConfirmCategory] = useState(null);
   const [isDeletingCategory, setIsDeletingCategory] = useState(false);
+
+// ─────────────────────────────────────────────
+  // State pour la gestion des clients (FonctionnalitéMoyenne#428)
+  // ─────────────────────────────────────────────
+  const [adminUsers, setAdminUsers] = useState([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [usersError, setUsersError] = useState(null);
+  const [userSearchFilter, setUserSearchFilter] = useState('');
+  const [usersCurrentPage, setUsersCurrentPage] = useState(1);
+  const [usersPagination, setUsersPagination] = useState({ total: 0, totalPages: 1, page: 1, limit: 20 });
+  const [usersPerPage, setUsersPerPage] = useState(20);
+
+  // Modal profil client (FonctionnalitéMoyenne#428)
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [isLoadingUserDetail, setIsLoadingUserDetail] = useState(false);
+  const [userDetailError, setUserDetailError] = useState(null);
+
+  // Filtre de l'historique des commandes du client (par statut)
+  const [userOrderStatusFilter, setUserOrderStatusFilter] = useState('');
+
+  // Modal de confirmation de désactivation d'un client
+  const [deactivateConfirmUser, setDeactivateConfirmUser] = useState(null);
+  const [isUpdatingUserActive, setIsUpdatingUserActive] = useState(false);
+
+  // Utilisateur admin connecté (pour masquer le bouton désactiver sur soi-même)
+  const { user: currentAdmin } = useAuth();
 
 // ─────────────────────────────────────────────
   // State pour la gestion des commandes (FonctionnalitéHaute#427)
@@ -292,11 +319,182 @@ function AdminDashboard() {
     return new Date(date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
   }
 
-  // Badge de statut coloré (FonctionnalitéHaute#427)
+// Badge de statut coloré (FonctionnalitéHaute#427)
   function getOrderStatusBadge(status) {
     const label = STATUS_LABELS[status] || status || 'En préparation';
     const color = STATUS_BADGES[status] || 'bg-gray-100 text-gray-700';
     return <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${color}`}>{label}</span>;
+  }
+
+// ─────────────────────────────────────────────
+  // Gestion des clients (FonctionnalitéMoyenne#428)
+  // ─────────────────────────────────────────────
+
+  // Badge de statut du compte client (vert=actif, gris=désactivé)
+  function getUserStatusBadge(isActive) {
+    return isActive ? (
+      <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-700">Actif</span>
+    ) : (
+      <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">Désactivé</span>
+    );
+  }
+
+  // Rafraîchir la liste des clients (avec recherche + pagination)
+  async function loadAdminUsers() {
+    setIsLoadingUsers(true);
+    setUsersError(null);
+    try {
+      const token = localStorage.getItem('token');
+      const params = new URLSearchParams({
+        page: usersCurrentPage,
+        limit: usersPerPage
+      });
+      if (userSearchFilter.trim()) params.set('search', userSearchFilter.trim());
+
+      const res = await fetch(`/api/admin/users?${params.toString()}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.message || 'Erreur lors de la récupération des clients');
+      }
+      setAdminUsers(data?.data?.users ?? []);
+      const pag = data?.data?.pagination || {};
+      setUsersPagination({
+        total: pag.total || 0,
+        totalPages: pag.totalPages || 1,
+        page: pag.page || 1,
+        limit: pag.limit || 20
+      });
+    } catch (error) {
+      setUsersError(error?.message || 'Impossible de charger les clients.');
+    } finally {
+      setIsLoadingUsers(false);
+    }
+  }
+
+  // Fetch des clients quand on ouvre le tab ou change de filtre/page
+  useEffect(() => {
+    if (activeTab !== 'clients') return;
+    let cancelled = false;
+    (async () => {
+      setIsLoadingUsers(true);
+      setUsersError(null);
+      try {
+        const token = localStorage.getItem('token');
+        const params = new URLSearchParams({
+          page: usersCurrentPage,
+          limit: usersPerPage
+        });
+        if (userSearchFilter.trim()) params.set('search', userSearchFilter.trim());
+
+        const res = await fetch(`/api/admin/users?${params.toString()}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data?.message || 'Erreur lors de la récupération des clients');
+        }
+        if (!cancelled) {
+          setAdminUsers(data?.data?.users ?? []);
+          const pag = data?.data?.pagination || {};
+          setUsersPagination({
+            total: pag.total || 0,
+            totalPages: pag.totalPages || 1,
+            page: pag.page || 1,
+            limit: pag.limit || 20
+          });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setUsersError(error?.message || 'Impossible de charger les clients.');
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingUsers(false);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeTab, usersCurrentPage, usersPerPage, userSearchFilter]);
+
+  // Reset de la page quand la recherche change
+  useEffect(() => {
+    setUsersCurrentPage(1);
+  }, [userSearchFilter]);
+
+  // Réinitialiser la recherche clients
+  function resetUserFilters() {
+    setUserSearchFilter('');
+    setUsersCurrentPage(1);
+  }
+
+  // Ouvrir la modal profil d'un client
+  async function openUserDetail(userId) {
+    setSelectedUser(null);
+    setUserOrderStatusFilter('');
+    setUserDetailError(null);
+    setIsLoadingUserDetail(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.message || 'Erreur lors de la récupération du profil client');
+      }
+      const detail = data?.data;
+      setSelectedUser({
+        ...detail,
+        user: {
+          ...(detail?.user || {}),
+          createdAt: detail?.user?.createdAt
+        }
+      });
+    } catch (error) {
+      setUserDetailError(error?.message || 'Impossible de charger le profil du client.');
+    } finally {
+      setIsLoadingUserDetail(false);
+    }
+  }
+
+  // Confirmer la désactivation / réactivation d'un compte client
+  async function handleToggleUserActive() {
+    if (!deactivateConfirmUser) return;
+    const userId = deactivateConfirmUser.id;
+    const targetActive = deactivateConfirmUser.isActive;
+    setIsUpdatingUserActive(true);
+    try {
+      const token = localStorage.getItem('token');
+      const endpoint = targetActive
+        ? `/api/admin/users/${userId}/deactivate`
+        : `/api/admin/users/${userId}/reactivate`;
+      const res = await fetch(endpoint, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.message || 'Erreur lors de la mise à jour du compte');
+      }
+      toast.success(targetActive ? 'Compte client désactivé avec succès' : 'Compte client réactivé avec succès');
+      // Fermer la modal de confirmation
+      setDeactivateConfirmUser(null);
+      // Rafraîchir la liste
+      await loadAdminUsers();
+      // Rafraîchir le profil affiché si le client était sélectionné
+      if (selectedUser?.user?.id === userId) {
+        await openUserDetail(userId);
+      }
+    } catch (error) {
+      toast.error(error?.message || 'Erreur lors de la mise à jour du compte');
+    } finally {
+      setIsUpdatingUserActive(false);
+    }
   }
 
   // Rafraîchir la liste des produits (après création/édition)
@@ -595,8 +793,11 @@ function AdminDashboard() {
 <button onClick={() => setActiveTab('products')} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-colors ${activeTab === 'products' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
             <Package size={20} /> Produits
           </button>
-          <button onClick={() => setActiveTab('categories')} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-colors ${activeTab === 'categories' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
+<button onClick={() => setActiveTab('categories')} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-colors ${activeTab === 'categories' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
             <FolderTree size={20} /> Catégories
+          </button>
+          <button onClick={() => setActiveTab('clients')} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-colors ${activeTab === 'clients' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
+            <Users size={20} /> Clients
           </button>
         </nav>
       </aside>
@@ -1238,7 +1439,7 @@ function AdminDashboard() {
                     </div>
                 </div>
 
-                {!isLoadingCategories && !categoriesError && categories.length > 0 && (
+{!isLoadingCategories && !categoriesError && categories.length > 0 && (
                     <p className="text-sm text-gray-500">
                         Affichage de <span className="font-semibold text-gray-900">{categories.length}</span> catégorie(s)
                     </p>
@@ -1246,9 +1447,159 @@ function AdminDashboard() {
               </div>
           )}
 
+          {activeTab === 'clients' && (
+              <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in">
+                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
+                  <div>
+                    <h1 className="text-2xl font-bold text-gray-900">Gestion des clients</h1>
+                    <p className="text-gray-500 text-sm mt-1">Consultez les profils clients et gérez l'activation de leurs comptes.</p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3">
+                      {/* Recherche par nom / email */}
+                      <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                          <input
+                              type="text"
+                              value={userSearchFilter}
+                              onChange={(e) => setUserSearchFilter(e.target.value)}
+                              placeholder="Rechercher (nom / email)..."
+                              className="pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-indigo-500 w-full sm:w-64 shadow-sm"
+                          />
+                      </div>
+
+                      {/* Réinitialiser la recherche */}
+                      {userSearchFilter.trim() && (
+                          <button
+                              onClick={resetUserFilters}
+                              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors shadow-sm"
+                          >
+                              <RefreshCw size={16} />
+                              Réinitialiser
+                          </button>
+                      )}
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                    <div className="overflow-x-auto">
+                        {isLoadingUsers ? (
+                            <div className="p-20 text-center flex flex-col items-center">
+                                <Loader2 size={40} className="text-indigo-500 animate-spin mb-4" />
+                                <h3 className="text-lg font-bold text-gray-900">Chargement des clients...</h3>
+                                <p className="text-gray-500 mt-2">Veuillez patienter.</p>
+                            </div>
+                        ) : usersError ? (
+                            <div className="p-20 text-center flex flex-col items-center">
+                                <X size={40} className="text-red-400 mb-4" />
+                                <h3 className="text-lg font-bold text-gray-900">Erreur de chargement</h3>
+                                <p className="text-gray-500 mt-2">{usersError}</p>
+                            </div>
+                        ) : adminUsers.length === 0 ? (
+                            <div className="p-20 text-center flex flex-col items-center">
+                                <Users size={48} className="text-gray-300 mb-4" />
+                                <h3 className="text-xl font-bold text-gray-900">Aucun client trouvé</h3>
+                                <p className="text-gray-500 mt-2">Aucun client ne correspond à votre recherche.</p>
+                            </div>
+                        ) : (
+                            <table className="w-full text-left border-collapse">
+                              <thead>
+                                <tr className="bg-gray-50 border-b border-gray-100">
+                                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Nom</th>
+                                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Email</th>
+                                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Date d'inscription</th>
+                                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Commandes</th>
+                                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Statut</th>
+                                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100">
+                                {adminUsers.map((user) => (
+                                  <tr key={user.id} className="hover:bg-gray-50/50 transition-colors group">
+                                    <td className="px-6 py-4">
+                                      <div className="flex items-center gap-3">
+                                        <div className="w-9 h-9 rounded-full bg-indigo-50 flex items-center justify-center flex-shrink-0">
+                                          <Users size={16} className="text-indigo-600" />
+                                        </div>
+                                        <div className="text-sm font-semibold text-gray-900">{user.name || 'Client'}</div>
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-sm text-gray-600">{user.email}</td>
+                                    <td className="px-6 py-4 text-sm text-gray-600">{formatDate(user.createdAt)}</td>
+                                    <td className="px-6 py-4">
+                                      {user.ordersCount > 0 ? (
+                                          <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-700">
+                                              {user.ordersCount} commande{user.ordersCount > 1 ? 's' : ''}
+                                          </span>
+                                      ) : (
+                                          <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-500">
+                                              Aucune commande
+                                          </span>
+                                      )}
+                                    </td>
+                                    <td className="px-6 py-4">{getUserStatusBadge(user.isActive)}</td>
+                                    <td className="px-6 py-4 text-right">
+                                      <button
+                                          onClick={() => openUserDetail(user.id)}
+                                          className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors"
+                                      >
+                                          <Eye size={14} />
+                                          Voir profil
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+</table>
+                        )}
+                    </div>
+                </div>
+
+                {!isLoadingUsers && !usersError && usersPagination.total > 0 && (
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+<p className="text-sm text-gray-500">
+                            Affichage de <span className="font-semibold text-gray-900">{adminUsers.length}</span> client(s)
+                            {userSearchFilter.trim() ? (
+                                <> sur <span className="font-semibold text-gray-900">{usersPagination.total}</span> résultat(s)</>
+                            ) : (
+                                <> (total <span className="font-semibold text-gray-900">{usersPagination.total}</span>)</>
+                            )}
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <select
+                                value={usersPerPage}
+                                onChange={(e) => setUsersPerPage(Number(e.target.value))}
+                                className="px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-indigo-500 shadow-sm cursor-pointer"
+                            >
+                                <option value={10}>10 / page</option>
+                                <option value={20}>20 / page</option>
+                                <option value={50}>50 / page</option>
+                            </select>
+                            <button
+                                onClick={() => setUsersCurrentPage(prev => Math.max(1, prev - 1))}
+                                disabled={usersCurrentPage <= 1}
+                                className="px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                                Précédent
+                            </button>
+                            <span className="px-4 py-2 text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl">
+                                Page {usersPagination.page} / {usersPagination.totalPages}
+                            </span>
+                            <button
+                                onClick={() => setUsersCurrentPage(prev => Math.min(usersPagination.totalPages, prev + 1))}
+                                disabled={usersCurrentPage >= usersPagination.totalPages}
+                                className="px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                                Suivant
+                            </button>
+                        </div>
+                    </div>
+                )}
+              </div>
+          )}
+
 </div>
       </main>
-
 {/* Modal de création / édition de produit */}
       <ProductFormModal
         isOpen={productModalOpen}
@@ -1467,7 +1818,188 @@ confirmDisabled={
                         </p>
                       </div>
                     </div>
+</div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmation de désactivation / réactivation d'un client (FonctionnalitéMoyenne#428) */}
+      <ConfirmDeleteModal
+        isOpen={!!deactivateConfirmUser}
+        title={deactivateConfirmUser?.isActive ? 'Désactiver ce compte ?' : 'Réactiver ce compte ?'}
+        entityName={deactivateConfirmUser?.name || ''}
+        message={
+          deactivateConfirmUser?.isActive
+            ? `Êtes-vous sûr de vouloir désactiver le compte de « ${deactivateConfirmUser?.name || 'ce client'} » ? Il ne pourra plus se connecter.`
+            : `Êtes-vous sûr de vouloir réactiver le compte de « ${deactivateConfirmUser?.name || 'ce client'} » ?`
+        }
+        warning={
+          deactivateConfirmUser?.isActive
+            ? 'Cette action empêchera le client de se connecter à son compte.'
+            : 'Le client pourra de nouveau se connecter à son compte.'
+        }
+        isDeleting={isUpdatingUserActive}
+        onClose={() => setDeactivateConfirmUser(null)}
+        onConfirm={handleToggleUserActive}
+      />
+
+      {/* Modal de détail profil client (FonctionnalitéMoyenne#428) */}
+      {selectedUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Overlay */}
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setSelectedUser(null)} />
+
+          {/* Contenu du modal */}
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95">
+            {/* En-tête */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center flex-shrink-0">
+                  <Users size={18} className="text-indigo-600" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">{selectedUser.user?.name || 'Client'}</h2>
+                  <p className="text-xs text-gray-500">
+                    {selectedUser.user?.email}
+                    {' • '}
+                    {getUserStatusBadge(selectedUser.user?.isActive)}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedUser(null)}
+                className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Corps du modal */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {isLoadingUserDetail ? (
+                <div className="p-10 text-center flex flex-col items-center">
+                  <Loader2 size={32} className="text-indigo-500 animate-spin mb-3" />
+                  <p className="text-gray-500 text-sm">Chargement du profil...</p>
+                </div>
+              ) : userDetailError ? (
+                <div className="p-10 text-center flex flex-col items-center">
+                  <X size={32} className="text-red-400 mb-3" />
+                  <h3 className="text-lg font-bold text-gray-900">Erreur de chargement</h3>
+                  <p className="text-gray-500 mt-2 text-sm">{userDetailError}</p>
+                </div>
+              ) : (
+                <>
+                  {/* Informations personnelles */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                      <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Nom</p>
+                      <p className="text-sm font-bold text-gray-900">{selectedUser.user?.name || '—'}</p>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                      <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Email</p>
+                      <p className="text-sm font-bold text-gray-900 truncate">{selectedUser.user?.email || '—'}</p>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                      <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Inscrit le</p>
+                      <p className="text-sm font-bold text-gray-900">{formatDate(selectedUser.user?.createdAt)}</p>
+                    </div>
                   </div>
+
+                  {/* Statistiques */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                    <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
+                      <p className="text-xs font-semibold text-indigo-500 uppercase mb-1">Total dépensé</p>
+                      <p className="text-xl font-bold text-indigo-700">
+                        {parseFloat(selectedUser.totalSpent || 0).toFixed(2)} €
+                      </p>
+                    </div>
+                    <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
+                      <p className="text-xs font-semibold text-indigo-500 uppercase mb-1">Nombre de commandes</p>
+                      <p className="text-xl font-bold text-indigo-700">{selectedUser.ordersCount || 0}</p>
+                    </div>
+                  </div>
+
+                  {/* Historique des commandes du client */}
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-bold text-gray-900">Historique des commandes</h3>
+                      {/* Filtre par statut */}
+                      <div className="relative">
+                        <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                        <select
+                          value={userOrderStatusFilter}
+                          onChange={(e) => setUserOrderStatusFilter(e.target.value)}
+                          className="pl-8 pr-6 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-indigo-500 shadow-sm appearance-none cursor-pointer"
+                        >
+                          <option value="">Tous les statuts</option>
+                          <option value="pending">En préparation</option>
+                          <option value="confirmed">Confirmée</option>
+                          <option value="shipped">Expédiée</option>
+                          <option value="delivered">Livrée</option>
+                          <option value="canceled">Annulée</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {(selectedUser.orders || []).length === 0 ? (
+                      <div className="p-8 text-center text-gray-500 border border-gray-200 rounded-xl">
+                        Aucune commande pour ce client.
+                      </div>
+                    ) : (
+                      <div className="overflow-hidden border border-gray-200 rounded-xl">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="bg-gray-50 border-b border-gray-100">
+                              <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Commande</th>
+                              <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Date</th>
+                              <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Statut</th>
+                              <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase text-right">Total</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {(selectedUser.orders || [])
+                              .filter((order) => !userOrderStatusFilter || order.status === userOrderStatusFilter)
+                              .map((order) => (
+                                <tr key={order.id} className="hover:bg-gray-50/50">
+                                  <td className="px-4 py-3 font-semibold text-indigo-600 text-sm">{order.orderId}</td>
+                                  <td className="px-4 py-3 text-sm text-gray-600">{formatDate(order.createdAt)}</td>
+                                  <td className="px-4 py-3">{getOrderStatusBadge(order.status)}</td>
+                                  <td className="px-4 py-3 text-sm font-bold text-gray-900 text-right">
+                                    {parseFloat(order.totalAmount || 0).toFixed(2)} €
+                                  </td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Boutons d'action : désactiver / réactiver */}
+                  {currentAdmin?.id !== selectedUser.user?.id && (
+                    <div className="flex justify-end pt-4 border-t border-gray-100">
+                      {selectedUser.user?.isActive ? (
+                        <button
+                          onClick={() => setDeactivateConfirmUser({ ...selectedUser.user, isActive: true })}
+                          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors shadow-sm"
+                        >
+                          <Power size={16} />
+                          Désactiver le compte
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setDeactivateConfirmUser({ ...selectedUser.user, isActive: false })}
+                          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 rounded-xl transition-colors shadow-sm"
+                        >
+                          <RotateCcw size={16} />
+                          Réactiver le compte
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
             </div>

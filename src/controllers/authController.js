@@ -10,7 +10,7 @@ const { Sequelize } = require('sequelize');
  * 
  * Fonctionnalités:
  * - POST /auth/register : Inscription utilisateur
- * - POST /auth/login : Connexion utilisateur  
+ * - POlST /auth/login : Connexion utilisateur  
  * - POST /auth/logout : Déconnexion (invalidation refresh token)
  * - GET /auth/me : Récupération profil utilisateur connecté
  */
@@ -188,12 +188,21 @@ class AuthController {
         });
       }
 
-      // Vérifier le mot de passe
+// Vérifier le mot de passe
       const isPasswordValid = await bcrypt.compare(password, user.password);
       if (!isPasswordValid) {
         return res.status(401).json({
           success: false,
           message: 'Identifiants invalides'
+        });
+      }
+
+      // Vérifier que le compte est actif (FonctionnalitéMoyenne#428)
+      // Un compte peut avoir été désactivé par un admin (isActive === false)
+      if (user.isActive === false) {
+        return res.status(403).json({
+          success: false,
+          message: 'Ce compte a été désactivé. Contactez le support.'
         });
       }
 

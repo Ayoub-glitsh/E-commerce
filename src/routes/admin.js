@@ -2,6 +2,7 @@ const express = require('express');
 const AdminProductController = require('../controllers/adminProductController');
 const AdminCategoryController = require('../controllers/adminCategoryController');
 const AdminOrderController = require('../controllers/adminOrderController');
+const AdminUserController = require('../controllers/adminUserController');
 const UploadController = require('../controllers/uploadController');
 const { upload } = require('../config/multer');
 const { verifyToken, verifyAdmin } = require('../middleware/auth');
@@ -146,5 +147,40 @@ router.get('/orders/:orderId', AdminOrderController.getOrderByIdAdmin);
  * @returns { success, data: { orderId, previousStatus, currentStatus, availableTransitions, ... } }
  */
 router.put('/orders/:orderId/status', AdminOrderController.updateOrderStatusAdmin);
+
+/**
+ * @route   GET /api/admin/users
+ * @desc    Liste tous les clients (FonctionnalitéMoyenne#428)
+ * @access  Admin only
+ * @query   { search?, page?, limit? }
+ * @returns { success, data: { users: [{ id, name, email, createdAt, isActive, ordersCount }], pagination } }
+ */
+router.get('/users', AdminUserController.getAllUsers);
+
+/**
+ * @route   GET /api/admin/users/:userId
+ * @desc    Profil détaillé d'un client (FonctionnalitéMoyenne#428)
+ * @access  Admin only
+ * @params  { userId: string }
+ * @returns { success, data: { user, orders: [], totalSpent, ordersCount } }
+ */
+router.get('/users/:userId', AdminUserController.getUserById);
+
+/**
+ * @route   PUT /api/admin/users/:userId/deactivate
+ * @access  Admin only
+ * @params  { userId: string }
+ * @returns { success, message, data: { userId, isActive: false } }
+ */
+router.put('/users/:userId/deactivate', AdminUserController.deactivateUser);
+
+/**
+ * @route   PUT /api/admin/users/:userId/reactivate
+ * @desc    Réactiver un compte client (FonctionnalitéMoyenne#428)
+ * @access  Admin only
+ * @params  { userId: string }
+ * @returns { success, message, data: { userId, isActive: true } }
+ */
+router.put('/users/:userId/reactivate', AdminUserController.reactivateUser);
 
 module.exports = router;
