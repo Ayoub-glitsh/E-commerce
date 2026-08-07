@@ -4,8 +4,11 @@ import {
   LayoutDashboard, ShoppingBag, Users, Settings, 
   TrendingUp, Package, DollarSign, Bell, Search, 
 Sparkles, ArrowUpRight, MoreVertical, X, CheckCircle2, ArrowUpDown, Loader2, Plus, Pencil, Trash2, Tag, FolderTree,
-  Eye, Calendar, RefreshCw, MapPin, CreditCard, Truck, Filter, Power, RotateCcw, UserCheck
+  Eye, Calendar, RefreshCw, MapPin, CreditCard, Truck, Filter, Power, RotateCcw, UserCheck, BarChart3
 } from 'lucide-react';
+import {
+  ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Legend
+} from 'recharts';
 import { Link } from 'react-router-dom';
 import useCartStore from './store/cartStore';
 import useAuth from './store/useAuth';
@@ -92,8 +95,20 @@ function AdminDashboard() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isLoadingOrderDetail, setIsLoadingOrderDetail] = useState(false);
   const [orderDetailError, setOrderDetailError] = useState(null);
-  const [selectedNewStatus, setSelectedNewStatus] = useState('');
+const [selectedNewStatus, setSelectedNewStatus] = useState('');
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+
+// ─────────────────────────────────────────────
+  // State pour les analytics (chiffre d'affaires + top produits)
+  // ─────────────────────────────────────────────
+  const [revenuePeriod, setRevenuePeriod] = useState('7d');
+  const [revenueData, setRevenueData] = useState({ series: [], totalRevenue: 0, totalOrders: 0 });
+  const [isLoadingRevenue, setIsLoadingRevenue] = useState(false);
+  const [revenueError, setRevenueError] = useState(null);
+
+  const [topProducts, setTopProducts] = useState([]);
+  const [isLoadingTopProducts, setIsLoadingTopProducts] = useState(false);
+  const [topProductsError, setTopProductsError] = useState(null);
 
   // Mapping des statuts backend (anglais) → français pour l'affichage
   const STATUS_LABELS = {
@@ -680,8 +695,80 @@ function AdminDashboard() {
               }
           }
       }
-      loadAdminCategories();
+loadAdminCategories();
       return () => { cancelled = true; };
+  }, [activeTab]);
+
+  // ─────────────────────────────────────────────
+  // Fetch des analytics (chiffre d'affaires + top produits)
+  // ─────────────────────────────────────────────
+
+  // Charger l'évolution du chiffre d'affaires selon la période sélectionnée
+  useEffect(() => {
+    if (activeTab !== 'analytics') return;
+    let cancelled = false;
+    (async () => {
+      setIsLoadingRevenue(true);
+      setRevenueError(null);
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`/api/admin/analytics/revenue?period=${revenuePeriod}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data?.message || 'Erreur lors de la récupération des analytics');
+        }
+        if (!cancelled) {
+          setRevenueData({
+            series: data?.data?.series ?? [],
+            totalRevenue: data?.data?.totalRevenue ?? 0,
+            totalOrders: data?.data?.totalOrders ?? 0
+          });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setRevenueError(error?.message || 'Impossible de charger les analytics.');
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingRevenue(false);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeTab, revenuePeriod]);
+
+  // Charger le top produits (indépendant de la période)
+  useEffect(() => {
+    if (activeTab !== 'analytics') return;
+    let cancelled = false;
+    (async () => {
+      setIsLoadingTopProducts(true);
+      setTopProductsError(null);
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/admin/analytics/top-products?limit=10', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data?.message || 'Erreur lors de la récupération du top produits');
+        }
+        if (!cancelled) {
+          setTopProducts(data?.data?.products ?? []);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setTopProductsError(error?.message || 'Impossible de charger le top produits.');
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingTopProducts(false);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
   }, [activeTab]);
 
   // Indicateur de stock : vert/orange/rouge
@@ -796,8 +883,11 @@ function AdminDashboard() {
 <button onClick={() => setActiveTab('categories')} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-colors ${activeTab === 'categories' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
             <FolderTree size={20} /> Catégories
           </button>
-          <button onClick={() => setActiveTab('clients')} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-colors ${activeTab === 'clients' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
+<button onClick={() => setActiveTab('clients')} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-colors ${activeTab === 'clients' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
             <Users size={20} /> Clients
+          </button>
+          <button onClick={() => setActiveTab('analytics')} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-colors ${activeTab === 'analytics' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
+            <BarChart3 size={20} /> Analytics
           </button>
         </nav>
       </aside>
@@ -1595,6 +1685,146 @@ function AdminDashboard() {
                         </div>
                     </div>
                 )}
+              </div>
+          )}
+
+          {activeTab === 'analytics' && (
+              <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in">
+                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
+                  <div>
+                    <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
+                    <p className="text-gray-500 text-sm mt-1">
+                      Suivez l'évolution de votre chiffre d'affaires et identifiez vos produits les plus performants.
+                    </p>
+                  </div>
+
+                  {/* Sélecteur de période */}
+                  <div className="flex items-center gap-1 p-1 bg-white border border-gray-200 rounded-xl shadow-sm">
+                    {[
+                      { value: '7d', label: '7 jours' },
+                      { value: '30d', label: '30 jours' },
+                      { value: '12m', label: '12 mois' }
+                    ].map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => setRevenuePeriod(opt.value)}
+                        className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
+                          revenuePeriod === opt.value
+                            ? 'bg-indigo-600 text-white shadow-sm'
+                            : 'text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Cartes récapitulatives */}
+                {!isLoadingRevenue && !revenueError && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center mb-4">
+                        <DollarSign size={20} className="text-indigo-600" />
+                      </div>
+                      <h3 className="text-gray-500 text-sm font-medium">Chiffre d'affaires total</h3>
+                      <p className="text-2xl font-bold text-gray-900 mt-1">{revenueData.totalRevenue.toFixed(2)} €</p>
+                    </div>
+                    <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center mb-4">
+                        <ShoppingBag size={20} className="text-indigo-600" />
+                      </div>
+                      <h3 className="text-gray-500 text-sm font-medium">Commandes (non annulées)</h3>
+                      <p className="text-2xl font-bold text-gray-900 mt-1">{revenueData.totalOrders}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Évolution du chiffre d'affaires */}
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                  <div className="p-6 border-b border-gray-100">
+                    <h2 className="text-lg font-bold text-gray-900">Évolution du chiffre d'affaires</h2>
+                    <p className="text-gray-500 text-sm mt-1">
+                      {revenuePeriod === '7d' ? '7 derniers jours' : revenuePeriod === '30d' ? '30 derniers jours' : '12 derniers mois'}
+                    </p>
+                  </div>
+                  <div className="p-6">
+                    {isLoadingRevenue ? (
+                      <div className="py-16 text-center flex flex-col items-center">
+                        <Loader2 size={40} className="text-indigo-500 animate-spin mb-4" />
+                        <h3 className="text-lg font-bold text-gray-900">Chargement des données...</h3>
+                      </div>
+                    ) : revenueError ? (
+                      <div className="py-16 text-center flex flex-col items-center">
+                        <X size={40} className="text-red-400 mb-4" />
+                        <h3 className="text-lg font-bold text-gray-900">Erreur de chargement</h3>
+                        <p className="text-gray-500 mt-2">{revenueError}</p>
+                      </div>
+                    ) : revenueData.series.length === 0 ? (
+                      <div className="py-16 text-center flex flex-col items-center">
+                        <BarChart3 size={48} className="text-gray-300 mb-4" />
+                        <h3 className="text-xl font-bold text-gray-900">Aucune donnée</h3>
+                        <p className="text-gray-500 mt-2">Aucune vente sur cette période.</p>
+                      </div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height={320}>
+                        <LineChart data={revenueData.series} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                          <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#6b7280' }} />
+                          <YAxis tick={{ fontSize: 12, fill: '#6b7280' }} />
+<Tooltip
+                            formatter={(value) => [`${value} €`, 'Chiffre d\u0027affaires']}
+                            contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb', fontSize: '14px' }}
+                          />
+                          <Legend />
+                          <Line type="monotone" dataKey="revenue" name="CA" stroke="#4f46e5" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
+                </div>
+
+                {/* Top produits les plus vendus */}
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                  <div className="p-6 border-b border-gray-100">
+                    <h2 className="text-lg font-bold text-gray-900">Top produits les plus vendus</h2>
+                    <p className="text-gray-500 text-sm mt-1">Classement basé sur la quantité vendue, toutes périodes confondues.</p>
+                  </div>
+                  <div className="p-6">
+                    {isLoadingTopProducts ? (
+                      <div className="py-16 text-center flex flex-col items-center">
+                        <Loader2 size={40} className="text-indigo-500 animate-spin mb-4" />
+                        <h3 className="text-lg font-bold text-gray-900">Chargement du classement...</h3>
+                      </div>
+                    ) : topProductsError ? (
+                      <div className="py-16 text-center flex flex-col items-center">
+                        <X size={40} className="text-red-400 mb-4" />
+                        <h3 className="text-lg font-bold text-gray-900">Erreur de chargement</h3>
+                        <p className="text-gray-500 mt-2">{topProductsError}</p>
+                      </div>
+                    ) : topProducts.length === 0 ? (
+                      <div className="py-16 text-center flex flex-col items-center">
+                        <Package size={48} className="text-gray-300 mb-4" />
+                        <h3 className="text-xl font-bold text-gray-900">Aucun produit vendu</h3>
+                        <p className="text-gray-500 mt-2">Dès la première vente, le classement apparaîtra ici.</p>
+                      </div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height={Math.max(80, topProducts.length * 48)}>
+                        <BarChart data={topProducts} layout="vertical" margin={{ top: 0, right: 40, left: 20, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" horizontal={false} />
+                          <XAxis type="number" tick={{ fontSize: 12, fill: '#6b7280' }} allowDecimals={false} />
+                          <YAxis type="category" dataKey="name" width={200} tick={{ fontSize: 12, fill: '#6b7280' }} tickFormatter={(name) => (name.length > 25 ? `${name.slice(0, 25)}…` : name)} />
+                          <Tooltip
+                            formatter={(value, name) => (name === 'quantitySold' ? [`${value}`, 'Quantité vendue'] : [`${value} €`, 'Revenu'])}
+                            contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb', fontSize: '14px' }}
+                          />
+                          <Legend />
+                          <Bar dataKey="quantitySold" name="Quantité vendue" fill="#4f46e5" radius={[0, 6, 6, 0]} barSize={24} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
+                </div>
               </div>
           )}
 

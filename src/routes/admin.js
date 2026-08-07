@@ -3,6 +3,7 @@ const AdminProductController = require('../controllers/adminProductController');
 const AdminCategoryController = require('../controllers/adminCategoryController');
 const AdminOrderController = require('../controllers/adminOrderController');
 const AdminUserController = require('../controllers/adminUserController');
+const AdminAnalyticsController = require('../controllers/adminAnalyticsController');
 const UploadController = require('../controllers/uploadController');
 const { upload } = require('../config/multer');
 const { verifyToken, verifyAdmin } = require('../middleware/auth');
@@ -182,5 +183,23 @@ router.put('/users/:userId/deactivate', AdminUserController.deactivateUser);
  * @returns { success, message, data: { userId, isActive: true } }
  */
 router.put('/users/:userId/reactivate', AdminUserController.reactivateUser);
+
+/**
+ * @route   GET /api/admin/analytics/revenue
+ * @desc    Évolution du chiffre d'affaires (série temporelle continue)
+ * @access  Admin only
+ * @query   { period?: "7d"|"30d"|"12m" } (défaut: 7d)
+ * @returns { success, data: { period, series: [{ date, revenue, ordersCount }], totalRevenue, totalOrders } }
+ */
+router.get('/analytics/revenue', AdminAnalyticsController.getRevenueAnalytics);
+
+/**
+ * @route   GET /api/admin/analytics/top-products
+ * @desc    Top produits les plus vendus (agrégation côté Node sur le JSONB items)
+ * @access  Admin only
+ * @query   { limit?: number } (défaut: 10, max: 50)
+ * @returns { success, data: { products: [{ productId, name, quantitySold, revenue }] } }
+ */
+router.get('/analytics/top-products', AdminAnalyticsController.getTopProducts);
 
 module.exports = router;
