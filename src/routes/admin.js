@@ -202,4 +202,21 @@ router.get('/analytics/revenue', AdminAnalyticsController.getRevenueAnalytics);
  */
 router.get('/analytics/top-products', AdminAnalyticsController.getTopProducts);
 
+/**
+ * @route   GET /api/admin/dashboard/metrics
+ * @desc    KPIs précis du tableau de bord (FonctionnalitéHaute#429)
+ * @access  Admin only
+ * @returns { success, data: { totalRevenue, todayOrdersCount, newCustomersCount,
+ *            outOfStockCount, lowStockProducts: [{ id, name, stock }] } }
+ */
+router.get('/dashboard/metrics', AdminAnalyticsController.getDashboardMetrics);
+
+/**
+ * @route   GET /api/admin/dashboard/recent-orders
+ * @desc    10 dernières commandes (tous utilisateurs) (FonctionnalitéHaute#429)
+ * @access  Admin only
+ * @returns { success, data: { orders: Array } } (format cohérent avec AdminOrderController.formatOrder)
+ */
+router.get('/dashboard/recent-orders', AdminAnalyticsController.getRecentOrders);
+
 module.exports = router;

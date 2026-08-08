@@ -4,7 +4,8 @@ import {
   LayoutDashboard, ShoppingBag, Users, Settings, 
   TrendingUp, Package, DollarSign, Bell, Search, 
 Sparkles, ArrowUpRight, MoreVertical, X, CheckCircle2, ArrowUpDown, Loader2, Plus, Pencil, Trash2, Tag, FolderTree,
-  Eye, Calendar, RefreshCw, MapPin, CreditCard, Truck, Filter, Power, RotateCcw, UserCheck, BarChart3
+Eye, Calendar, RefreshCw, MapPin, CreditCard, Truck, Filter, Power, RotateCcw, UserCheck, BarChart3,
+  UserPlus, AlertTriangle
 } from 'lucide-react';
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Legend
@@ -106,9 +107,31 @@ const [selectedNewStatus, setSelectedNewStatus] = useState('');
   const [isLoadingRevenue, setIsLoadingRevenue] = useState(false);
   const [revenueError, setRevenueError] = useState(null);
 
-  const [topProducts, setTopProducts] = useState([]);
+const [topProducts, setTopProducts] = useState([]);
   const [isLoadingTopProducts, setIsLoadingTopProducts] = useState(false);
   const [topProductsError, setTopProductsError] = useState(null);
+
+  // ─────────────────────────────────────────────
+  // State des métriques précises du tableau de bord (FonctionnalitéHaute#429)
+  // ─────────────────────────────────────────────
+  const [dashboardMetrics, setDashboardMetrics] = useState({
+    totalRevenue: 0,
+    todayOrdersCount: 0,
+    newCustomersCount: 0,
+    outOfStockCount: 0,
+    lowStockProducts: []
+  });
+  const [isLoadingMetrics, setIsLoadingMetrics] = useState(false);
+  const [metricsError, setMetricsError] = useState(null);
+
+  // 10 dernières commandes (tab overview)
+  const [recentOrders, setRecentOrders] = useState([]);
+  const [isLoadingRecentOrders, setIsLoadingRecentOrders] = useState(false);
+  const [recentOrdersError, setRecentOrdersError] = useState(null);
+
+  // Dismiss temporaire des bandeaux d'alerte stock (pas persistant)
+  const [isLowStockAlertDismissed, setIsLowStockAlertDismissed] = useState(false);
+  const [isOutOfStockAlertDismissed, setIsOutOfStockAlertDismissed] = useState(false);
 
   // Mapping des statuts backend (anglais) → français pour l'affichage
   const STATUS_LABELS = {
@@ -771,6 +794,133 @@ loadAdminCategories();
     return () => { cancelled = true; };
   }, [activeTab]);
 
+// ─────────────────────────────────────────────
+  // Rafraîchir les métriques + dernières commandes du tableau de bord (FonctionnalitéHaute#429)
+  // ─────────────────────────────────────────────
+  async function refreshDashboardMetrics() {
+    // Recharger les métriques du tableau de bord
+    setIsLoadingMetrics(true);
+    setMetricsError(null);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/admin/dashboard/metrics', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.message || 'Erreur lors de la récupération des métriques');
+      }
+      if (data?.data) {
+        setDashboardMetrics({
+          totalRevenue: data.data.totalRevenue ?? 0,
+          todayOrdersCount: data.data.todayOrdersCount ?? 0,
+          newCustomersCount: data.data.newCustomersCount ?? 0,
+          outOfStockCount: data.data.outOfStockCount ?? 0,
+          lowStockProducts: data.data.lowStockProducts ?? []
+        });
+      }
+    } catch (error) {
+      setMetricsError(error?.message || 'Impossible de charger les métriques.');
+    } finally {
+      setIsLoadingMetrics(false);
+    }
+
+    // Recharger les 10 dernières commandes
+    setIsLoadingRecentOrders(true);
+    setRecentOrdersError(null);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/admin/dashboard/recent-orders', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.message || 'Erreur lors de la récupération des dernières commandes');
+      }
+      setRecentOrders(mapAdminOrders(data?.data?.orders ?? []));
+    } catch (error) {
+      setRecentOrdersError(error?.message || 'Impossible de charger les dernières commandes.');
+    } finally {
+      setIsLoadingRecentOrders(false);
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  // Fetch des métriques précises du tableau de bord (FonctionnalitéHaute#429)
+  // ─────────────────────────────────────────────
+  useEffect(() => {
+    if (activeTab !== 'dashboard') return;
+    let cancelled = false;
+    (async () => {
+      setIsLoadingMetrics(true);
+      setMetricsError(null);
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/admin/dashboard/metrics', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data?.message || 'Erreur lors de la récupération des métriques');
+        }
+        if (!cancelled && data?.data) {
+          setDashboardMetrics({
+            totalRevenue: data.data.totalRevenue ?? 0,
+            todayOrdersCount: data.data.todayOrdersCount ?? 0,
+            newCustomersCount: data.data.newCustomersCount ?? 0,
+            outOfStockCount: data.data.outOfStockCount ?? 0,
+            lowStockProducts: data.data.lowStockProducts ?? []
+          });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setMetricsError(error?.message || 'Impossible de charger les métriques.');
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingMetrics(false);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeTab]);
+
+  // ─────────────────────────────────────────────
+  // Fetch des 10 dernières commandes (FonctionnalitéHaute#429)
+  // ─────────────────────────────────────────────
+  useEffect(() => {
+    if (activeTab !== 'dashboard') return;
+    let cancelled = false;
+    (async () => {
+      setIsLoadingRecentOrders(true);
+      setRecentOrdersError(null);
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/admin/dashboard/recent-orders', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data?.message || 'Erreur lors de la récupération des dernières commandes');
+        }
+        if (!cancelled) {
+          // Réutilise mapAdminOrders pour un affichage homogène avec le tab Commandes
+          setRecentOrders(mapAdminOrders(data?.data?.orders ?? []));
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setRecentOrdersError(error?.message || 'Impossible de charger les dernières commandes.');
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingRecentOrders(false);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeTab]);
+
+
   // Indicateur de stock : vert/orange/rouge
   const getStockIndicator = (stock) => {
       if (stock > 10) return { color: 'green', label: 'En stock' };
@@ -952,31 +1102,139 @@ loadAdminCategories();
         <div className="flex-1 overflow-auto p-6 md:p-8">
           
       
-          {activeTab === 'dashboard' && (
+{activeTab === 'dashboard' && (
               <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in">
                 <div className="flex justify-between items-end">
                   <div>
                     <h1 className="text-2xl font-bold text-gray-900">Tableau de bord</h1>
                     <p className="text-gray-500 text-sm mt-1">Vos statistiques en temps réel basées sur les ventes.</p>
                   </div>
+<button
+                    onClick={refreshDashboardMetrics}
+                    className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors shadow-sm"
+                  >
+                    <RefreshCw size={16} />
+                    Actualiser
+                  </button>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {stats.map((stat, index) => {
-                    const Icon = stat.icon;
-                    return (
-                      <div key={index} className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-                        <div className="flex justify-between items-start mb-4">
-                          <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center">
-                            <Icon size={20} className="text-indigo-600" />
-                          </div>
-                        </div>
-                        <h3 className="text-gray-500 text-sm font-medium">{stat.title}</h3>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">{stat.value}</p>
+                {/* Bandeaux d'alerte stock (FonctionnalitéHaute#429) */}
+                {!isOutOfStockAlertDismissed && dashboardMetrics.outOfStockCount > 0 && (
+                  <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
+                        <AlertTriangle size={20} className="text-red-600" />
                       </div>
-                    );
-                  })}
-                </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-red-700">Rupture de stock</h3>
+                        <p className="text-sm text-red-600 mt-0.5">
+                          {dashboardMetrics.outOfStockCount === 1
+                            ? '1 produit est en rupture de stock.'
+                            : `${dashboardMetrics.outOfStockCount} produits sont en rupture de stock.`}{' '}
+                          <button onClick={() => setActiveTab('products')} className="font-semibold underline hover:text-red-800">
+                            Consulter le catalogue
+                          </button>
+                        </p>
+                      </div>
+                    </div>
+                    <button onClick={() => setIsOutOfStockAlertDismissed(true)} className="p-1 text-red-400 hover:text-red-700 transition-colors" aria-label="Fermer">
+                      <X size={18} />
+                    </button>
+                  </div>
+                )}
+
+                {!isLowStockAlertDismissed && dashboardMetrics.lowStockProducts.length > 0 && (
+                  <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center flex-shrink-0">
+                        <Package size={20} className="text-orange-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-orange-700">Stock faible</h3>
+                        <p className="text-sm text-orange-600 mt-0.5">
+                          {dashboardMetrics.lowStockProducts.length === 1
+                            ? '1 produit a un stock faible.'
+                            : `${dashboardMetrics.lowStockProducts.length} produits ont un stock faible.`}{' '}
+                          <button onClick={() => setActiveTab('products')} className="font-semibold underline hover:text-orange-800">
+                            Réapprovisionner
+                          </button>
+                        </p>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {dashboardMetrics.lowStockProducts.slice(0, 5).map((p) => (
+                            <span key={p.id} className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-white border border-orange-200 text-orange-700">
+                              {p.name} <span className="text-orange-500">({p.stock})</span>
+                            </span>
+                          ))}
+                          {dashboardMetrics.lowStockProducts.length > 5 && (
+                            <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full bg-white border border-orange-200 text-orange-600">
+                              +{dashboardMetrics.lowStockProducts.length - 5} autres
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <button onClick={() => setIsLowStockAlertDismissed(true)} className="p-1 text-orange-400 hover:text-orange-700 transition-colors" aria-label="Fermer">
+                      <X size={18} />
+                    </button>
+                  </div>
+                )}
+
+                {isLoadingMetrics ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {[0, 1, 2, 3].map((i) => (
+                      <div key={i} className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm animate-pulse">
+                        <div className="w-10 h-10 rounded-xl bg-gray-100 mb-4"></div>
+                        <div className="h-3 bg-gray-100 rounded w-24 mb-2"></div>
+                        <div className="h-6 bg-gray-100 rounded w-32"></div>
+                      </div>
+                    ))}
+                  </div>
+                ) : metricsError ? (
+                  <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-3">
+                    <AlertTriangle size={20} className="text-red-500" />
+                    <p className="text-sm text-gray-600">{metricsError}</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {/* Revenu total */}
+                    <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center mb-4">
+                        <DollarSign size={20} className="text-indigo-600" />
+                      </div>
+                      <h3 className="text-gray-500 text-sm font-medium">Revenu total</h3>
+                      <p className="text-2xl font-bold text-gray-900 mt-1">
+                        {dashboardMetrics.totalRevenue.toFixed(2)} €
+                      </p>
+                    </div>
+
+                    {/* Commandes aujourd'hui */}
+                    <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center mb-4">
+                        <ShoppingBag size={20} className="text-indigo-600" />
+                      </div>
+                      <h3 className="text-gray-500 text-sm font-medium">Commandes aujourd'hui</h3>
+                      <p className="text-2xl font-bold text-gray-900 mt-1">{dashboardMetrics.todayOrdersCount}</p>
+                    </div>
+
+                    {/* Nouveaux clients */}
+                    <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center mb-4">
+                        <UserPlus size={20} className="text-indigo-600" />
+                      </div>
+                      <h3 className="text-gray-500 text-sm font-medium">Nouveaux clients</h3>
+                      <p className="text-2xl font-bold text-gray-900 mt-1">{dashboardMetrics.newCustomersCount}</p>
+                    </div>
+
+                    {/* Ruptures de stock */}
+                    <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center mb-4">
+                        <AlertTriangle size={20} className="text-indigo-600" />
+                      </div>
+                      <h3 className="text-gray-500 text-sm font-medium">Ruptures de stock</h3>
+                      <p className="text-2xl font-bold text-gray-900 mt-1">{dashboardMetrics.outOfStockCount}</p>
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                   <div className="lg:col-span-1 space-y-6">
@@ -987,7 +1245,7 @@ loadAdminCategories();
                           <Sparkles className="text-indigo-300" size={24} />
                           <h2 className="text-lg font-bold text-white">Insights IA</h2>
                         </div>
-                        
+
                         <div className="space-y-4">
                             {totalOrders === 0 ? (
                                 <p className="text-sm text-indigo-200/70">L'IA analysera vos données dès votre première vente !</p>
@@ -1026,9 +1284,16 @@ loadAdminCategories();
                         <h2 className="text-lg font-bold text-gray-900">Commandes Récentes</h2>
                         <button onClick={() => setActiveTab('orders')} className="text-sm font-medium text-indigo-600 hover:text-indigo-800 transition-colors">Voir tout</button>
                       </div>
-                      
+
                       <div className="overflow-x-auto flex-1">
-                        {adminOrders.length === 0 ? (
+                        {isLoadingRecentOrders ? (
+                            <div className="p-10 text-center flex flex-col items-center">
+                              <Loader2 size={28} className="text-indigo-500 animate-spin mb-3" />
+                              <p className="text-gray-500 text-sm">Chargement des commandes...</p>
+                            </div>
+                        ) : recentOrdersError ? (
+                            <div className="p-10 text-center text-gray-500 text-sm">{recentOrdersError}</div>
+                        ) : recentOrders.length === 0 ? (
                             <div className="p-8 text-center text-gray-500">Aucune commande pour le moment.</div>
                         ) : (
                             <table className="w-full text-left border-collapse">
@@ -1041,7 +1306,7 @@ loadAdminCategories();
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-gray-100">
-                                {adminOrders.slice(0, 5).map((order) => (
+                                {recentOrders.slice(0, 5).map((order) => (
                                   <tr key={order.id} className="hover:bg-gray-50/50 transition-colors">
                                     <td className="px-6 py-4 font-semibold text-indigo-600 text-sm">
                                         <Link to={`/order-detail/${order.id}`}>{order.id}</Link>
@@ -1058,6 +1323,66 @@ loadAdminCategories();
                     </div>
                   </div>
 
+                </div>
+
+                {/* Liste complète des 10 dernières commandes (FonctionnalitéHaute#429) */}
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                  <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                    <h2 className="text-lg font-bold text-gray-900">30 dernières commandes</h2>
+                    <button onClick={() => setActiveTab('orders')} className="text-sm font-medium text-indigo-600 hover:text-indigo-800 transition-colors">Voir tout</button>
+                  </div>
+                  <div className="overflow-x-auto">
+                    {isLoadingRecentOrders ? (
+                      <div className="p-12 text-center flex flex-col items-center">
+                        <Loader2 size={32} className="text-indigo-500 animate-spin mb-3" />
+                        <p className="text-gray-500 text-sm">Chargement des commandes...</p>
+                      </div>
+                    ) : recentOrdersError ? (
+                      <div className="p-12 text-center text-gray-500 text-sm">{recentOrdersError}</div>
+                    ) : recentOrders.length === 0 ? (
+                      <div className="p-12 text-center text-gray-500">Aucune commande pour le moment.</div>
+                    ) : (
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-100">
+                            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">ID Commande</th>
+                            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Client</th>
+                            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Date</th>
+                            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Statut</th>
+                            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Articles</th>
+                            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Total</th>
+                            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {recentOrders.map((order) => (
+                            <tr key={order.id} className="hover:bg-gray-50/50 transition-colors group">
+                              <td className="px-6 py-4 font-semibold text-indigo-600 text-sm">{order.id}</td>
+                              <td className="px-6 py-4">
+                                <div className="text-sm font-medium text-gray-900">{order.customer || "Client Privé"}</div>
+                                <div className="text-xs text-gray-500 mt-0.5 truncate max-w-[160px]">{order.email}</div>
+                              </td>
+                              <td className="px-6 py-4 text-sm text-gray-600">{order.date}</td>
+                              <td className="px-6 py-4">{getOrderStatusBadge(order._status)}</td>
+                              <td className="px-6 py-4 text-sm text-gray-600">
+                                {order.itemsCount} {order.itemsCount > 1 ? 'articles' : 'article'}
+                              </td>
+                              <td className="px-6 py-4 text-sm font-bold text-gray-900">{order.total.toFixed(2)} €</td>
+                              <td className="px-6 py-4 text-right">
+                                <button
+                                  onClick={() => openOrderDetail(order.orderId)}
+                                  className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors"
+                                >
+                                  <Eye size={14} />
+                                  Voir détail
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
                 </div>
               </div>
           )}

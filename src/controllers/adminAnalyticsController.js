@@ -1,4 +1,4 @@
-const { Order, Product } = require('../../models');
+const { Order, Product, User } = require('../../models');
 const { Op } = require('sequelize');
 
 /**
@@ -7,6 +7,8 @@ const { Op } = require('sequelize');
  * Routes ADMIN uniquement (middleware verifyAdmin requis):
  * - GET /admin/analytics/revenue       : Évolution du chiffre d'affaires (série temporelle)
  * - GET /admin/analytics/top-products  : Top produits les plus vendus
+ * - GET /admin/dashboard/metrics       : KPIs précis du tableau de bord (FonctionnalitéHaute#429)
+ * - GET /admin/dashboard/recent-orders : 10 dernières commandes (FonctionnalitéHaute#429)
  *
  * Décision métier :
  * Les commandes au statut "canceled" sont EXCLUES du calcul du chiffre d'affaires
@@ -210,7 +212,7 @@ class AdminAnalyticsController {
         });
       }
 
-      res.status(200).json({
+res.status(200).json({
         success: true,
         data: {
           products
@@ -222,6 +224,173 @@ class AdminAnalyticsController {
       res.status(500).json({
         success: false,
         message: 'Erreur serveur lors de la récupération du top produits',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Helper : calcule le revenu total (toutes périodes) sur les commandes non annulées.
+   *
+   * Factorise la logique déjà utilisée dans getRevenueAnalytics pour éviter toute
+   * duplication lors du calcul du KPI "Revenus totaux" du tableau de bord.
+   *
+   * Décision métier : les commandes au statut "canceled" sont EXCLUES du calcul.
+   *
+   * @returns {Promise<number>} Somme des totalAmount des commandes non annulées
+   */
+  static async computeTotalRevenue() {
+    // Récupérer uniquement le champ totalAmount des commandes non annulées
+    const orders = await Order.findAll({
+      where: {
+        status: { [Op.ne]: 'canceled' } // Décision métier : exclure les commandes annulées
+      },
+      attributes: ['totalAmount']
+    });
+
+    // Somme des montants (avec fallback à 0 si valeur invalide)
+    const total = orders.reduce((sum, order) => sum + (parseFloat(order.totalAmount) || 0), 0);
+    return Number(total.toFixed(2));
+  }
+
+  /**
+   * GET /admin/dashboard/metrics
+   * FonctionnalitéHaute#429
+   *
+   * Retourne les KPIs précis du tableau de bord "Aujourd'hui" ainsi que les alertes
+   * de stock faible. Contrairement aux cartes génériques (toutes périodes), ces
+   * métriques sont ciblées :
+   *   - totalRevenue        : revenu total (toutes périodes, commandes non annulées)
+   *   - todayOrdersCount    : commandes créées depuis le début de la journée
+   *   - newCustomersCount   : clients inscrits depuis le début de la journée ("Aujourd'hui")
+   *   - outOfStockCount     : produits en rupture totale (stock = 0, actifs)
+   *   - lowStockProducts    : produits actifs avec 0 < stock < 5 (pour l'alerte automatique)
+   *
+   * @param {Object} req - Requête Express
+   * @param {Object} res - Réponse Express
+   */
+  static async getDashboardMetrics(req, res) {
+    try {
+      // Début de la journée actuelle (00:00:00) pour les métriques "du jour"
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+
+      // Lancer les requêtes en parallèle pour optimiser le temps de réponse
+      const [
+        totalRevenue,
+        todayOrdersCount,
+        newCustomersCount,
+        outOfStockCount,
+        lowStockProducts
+      ] = await Promise.all([
+        // Revenu total : réutilise la logique factorisée (non annulées)
+        AdminAnalyticsController.computeTotalRevenue(),
+        // Commandes créées aujourd'hui (tous statuts confondus)
+        Order.count({
+          where: {
+            created_at: { [Op.gte]: startOfToday }
+          }
+        }),
+        // Nouveaux clients inscrits aujourd'hui
+        User.count({
+          where: {
+            created_at: { [Op.gte]: startOfToday }
+          }
+        }),
+        // Produits en rupture totale (stock = 0) et actifs
+        Product.count({
+          where: {
+            stock: 0,
+            isActive: true
+          }
+        }),
+        // Produits à stock faible (0 < stock < 5) et actifs — pour l'alerte
+        Product.findAll({
+          where: {
+            stock: { [Op.gt]: 0, [Op.lt]: 5 },
+            isActive: true
+          },
+          attributes: ['id', 'name', 'stock']
+        })
+      ]);
+
+      // Formater la liste des produits à stock faible
+      const lowStockList = lowStockProducts.map((p) => ({
+        id: p.id,
+        name: p.name,
+        stock: p.stock
+      }));
+
+      res.status(200).json({
+        success: true,
+        data: {
+          totalRevenue,
+          todayOrdersCount,
+          newCustomersCount,
+          outOfStockCount,
+          lowStockProducts: lowStockList
+        }
+      });
+
+    } catch (error) {
+      console.error('Erreur lors de la récupération des métriques du tableau de bord:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erreur serveur lors de la récupération des métriques du tableau de bord',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * GET /admin/dashboard/recent-orders
+   * FonctionnalitéHaute#429
+   *
+   * Retourne les 10 dernières commandes (tous utilisateurs confondus), triées par
+   * date de création décroissante. Le formatage réutilise AdminOrderController.formatOrder
+   * afin de rester cohérent avec le tab "Commandes" (statut, client, montant, dates).
+   *
+   * @param {Object} req - Requête Express
+   * @param {Object} res - Réponse Express
+   */
+  static async getRecentOrders(req, res) {
+    try {
+      // Import dynamique pour éviter une dépendance circulaire au sommet du fichier
+      const AdminOrderController = require('./adminOrderController');
+
+      // Récupérer les 10 dernières commandes avec les infos utilisateur (email, nom)
+      const orders = await Order.findAll({
+        include: [{
+          model: User,
+          as: 'user',
+          attributes: ['id', 'email', 'name'], // Sans données sensibles (mot de passe, refreshToken)
+          required: false // LEFT JOIN pour ne pas exclure les commandes sans utilisateur
+        }],
+        order: [['created_at', 'DESC']], // Plus récentes en premier
+        limit: 10,
+        attributes: [
+          'id', 'orderId', 'userId', 'status', 'totalAmount', 'items',
+          'shippingAddress', 'billingAddress', 'paymentMethod',
+          'trackingNumber', 'notes', 'created_at', 'updated_at',
+          'confirmedAt', 'shippedAt', 'deliveredAt', 'canceledAt'
+        ]
+      });
+
+      // Formater chaque commande avec le format réutilisé côté admin
+      const formattedOrders = orders.map((order) => AdminOrderController.formatOrder(order));
+
+      res.status(200).json({
+        success: true,
+        data: {
+          orders: formattedOrders
+        }
+      });
+
+    } catch (error) {
+      console.error('Erreur lors de la récupération des dernières commandes:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erreur serveur lors de la récupération des dernières commandes',
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
