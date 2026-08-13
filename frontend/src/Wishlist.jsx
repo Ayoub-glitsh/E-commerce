@@ -14,6 +14,15 @@ const wishList=useCartStore(state=>state.wish);
 const deleteAllWishList=useCartStore(state=>state.clearWish);
 const deleteFromWishList=useCartStore(state=>state.deleteFromWishList);
 const addToCart=useCartStore(state=>state.moveToCart);
+const fetchWishlist=useCartStore(state=>state.fetchWishlist);
+   
+    // Charger la wishlist depuis le backend au montage du composant
+    useEffect(() => {
+        fetchWishlist();
+    }, [fetchWishlist]);
+
+
+
    
 
 

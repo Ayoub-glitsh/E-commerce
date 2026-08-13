@@ -1,5 +1,4 @@
 const { Wishlist, WishlistItem, Product, Category } = require('../../models');
-const catalogService = require('../services/catalogService');
 
 /**
  * Contrôleur pour la gestion de la wishlist (favoris)
@@ -126,22 +125,41 @@ class WishlistController {
         });
       }
 
-      // Vérifier que le produit existe et est actif via l'API Catalogue
+// Vérifier que le produit existe et est actif directement en base
       console.log(`🎯 Ajout aux favoris: Vérification produit ${productId}`);
       
       let catalogProduct;
       try {
-        catalogProduct = await catalogService.getProduct(productId);
-        
+        catalogProduct = await Product.findOne({
+          where: { id: productId },
+          attributes: ['id', 'name', 'price', 'images', 'isActive', 'stock']
+        });
+
+        if (!catalogProduct) {
+          return res.status(404).json({
+            success: false,
+            message: "Produit non trouvé dans le catalogue"
+          });
+        }
+
         if (!catalogProduct.isActive) {
           return res.status(400).json({
             success: false,
             message: "Ce produit n'est plus disponible et ne peut être ajouté aux favoris"
           });
         }
-        
+
+        // Formater comme attendu par le reste du contrôleur
+        catalogProduct = {
+          id: catalogProduct.id,
+          name: catalogProduct.name,
+          price: parseFloat(catalogProduct.price),
+          images: catalogProduct.images || [],
+          isActive: catalogProduct.isActive
+        };
+
       } catch (error) {
-        console.error('Erreur lors de la vérification du produit catalogue:', error);
+        console.error('Erreur lors de la vérification du produit:', error);
         return res.status(400).json({
           success: false,
           message: error.message || "Produit non trouvé dans le catalogue"

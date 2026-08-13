@@ -57,10 +57,17 @@ module.exports = (sequelize, DataTypes) => {
         }
       }
     },
-    refreshToken: {
+refreshToken: {
       type: DataTypes.TEXT,
       allowNull: true,
       field: 'refresh_token' // Mapping vers la colonne snake_case
+    },
+    isActive: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
+      field: 'is_active', // Mapping vers la colonne snake_case (FonctionnalitéMoyenne#428)
+      comment: 'Indique si le compte est actif (false = désactivé par un admin)'
     }
   }, {
     tableName: 'users',

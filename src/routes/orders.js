@@ -1,6 +1,6 @@
 const express = require('express');
 const OrderController = require('../controllers/orderController');
-const { verifyToken } = require('../middleware/auth');
+const { verifyToken, verifyAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -238,7 +238,7 @@ router.get('/:orderId/tracking', verifyToken, OrderController.getOrderTracking);
 /**
  * @route   PUT /api/orders/:orderId/status
  * @desc    Mettre à jour le statut d'une commande (machine à états)
- * @access  Private (JWT required)
+ * @access  Admin only (JWT + verifyAdmin) - action de gestion réservée aux admins
  * @headers Authorization: Bearer <accessToken>
  * @params  { orderId: string }
  * @body    { newStatus: "pending"|"confirmed"|"shipped"|"delivered"|"canceled" }
@@ -269,11 +269,12 @@ router.get('/:orderId/tracking', verifyToken, OrderController.getOrderTracking);
  * - Met à jour les dates de transition (confirmedAt, shippedAt, deliveredAt, canceledAt)
  * - Ajoute des notes automatiques pour certains statuts
  * 
- * Erreurs Possibles:
+* Erreurs Possibles:
  * - 400: Statut invalide ou transition non autorisée
  * - 404: Commande non trouvée
  * - 401: Token manquant/invalide
+ * - 403: Accès refusé (privilèges admin requis) - fix sécurité FonctionnalitéHaute#427
  */
-router.put('/:orderId/status', verifyToken, OrderController.updateOrderStatus);
+router.put('/:orderId/status', verifyToken, verifyAdmin, OrderController.updateOrderStatus);
 
 module.exports = router;

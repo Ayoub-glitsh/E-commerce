@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 
 // Importation des routes
 const authRoutes = require('./routes/auth');
@@ -12,6 +13,7 @@ const wishlistRoutes = require('./routes/wishlist');
 const orderRoutes = require('./routes/orders');
 const paymentRoutes = require('./routes/payments');
 const webhookRoutes = require('./routes/webhooks');
+const internalChatbotRoutes = require('./routes/internalChatbotRoutes');
 
 // Importation des middlewares
 const rawBodyMiddleware = require('./middleware/rawBody');
@@ -39,6 +41,9 @@ app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
   next();
 });
+
+// Servir les fichiers uploadés (images de produits) en statique
+app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
 
 /**
  * Configuration des routes principales
@@ -80,6 +85,11 @@ app.use('/api/payments', paymentRoutes);
 
 // Routes des webhooks (FonctionnalitéHaute#1781)
 app.use('/webhooks', webhookRoutes);
+
+// Routes internes du chatbot IA (FonctionnalitéHaute#1671)
+// ⚠️ Accès interne uniquement (Flask chatbot → Node, réseau local).
+// En production : restreindre l'accès (clé interne partagée ou IP/réseau).
+app.use('/api/internal', internalChatbotRoutes);
 
 // Route de test de la base de données
 app.get('/api/test-db', async (req, res) => {

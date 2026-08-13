@@ -239,34 +239,53 @@ class PaymentController {
           event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
         }
       } catch (err) {
+        // ⚠️ IMPORTANT: si constructEvent() a échoué, la variable `event` n'est PAS définie.
+        // On ne doit donc jamais référencer `event` ici (cela provoquerait une erreur secondaire
+        // non gérée et un 500 générique au lieu d'un 400 clair pour signature invalide).
+        // On logge uniquement l'erreur réelle de validation de la signature.
         console.error(`❌ Erreur validation signature webhook: ${err.message}`);
+        // Retour immédiat avec une réponse 400 claire : on stoppe l'exécution avec `return`.
         return res.status(400).json({
           success: false,
-          message: `Webhook signature verification failed: ${err.message}`
+          message: 'Signature webhook invalide.'
         });
       }
 
       console.log(`🎯 Event type: ${event.type}`);
 
       // Gérer différents types d'événements Stripe
-      switch (event.type) {
-        case 'payment_intent.succeeded':
-          await PaymentController.handlePaymentIntentSucceeded(event.data.object);
-          break;
+      // Le traitement de l'événement est isolé dans un try/catch séparé :
+      // si le traitement applicatif (ex: order.updateStatus) échoue, on logge l'erreur
+      // MAIS on renvoie quand même 200 à Stripe. Sinon, Stripe réessaierait indéfiniment
+      // un événement qui pose un problème côté application, pas côté Stripe.
+      try {
+        switch (event.type) {
+          case 'payment_intent.succeeded':
+            await PaymentController.handlePaymentIntentSucceeded(event.data.object);
+            break;
 
-        case 'payment_intent.payment_failed':
-          await PaymentController.handlePaymentIntentFailed(event.data.object);
-          break;
+          case 'payment_intent.payment_failed':
+            // Le handler existe déjà, on l'utilise pour enregistrer l'échec de paiement.
+            await PaymentController.handlePaymentIntentFailed(event.data.object);
+            break;
 
-        case 'payment_intent.canceled':
-          await PaymentController.handlePaymentIntentCanceled(event.data.object);
-          break;
+          case 'payment_intent.canceled':
+            await PaymentController.handlePaymentIntentCanceled(event.data.object);
+            break;
 
-        default:
-          console.log(`⚠️ Événement non géré: ${event.type}`);
+          default:
+            // Événement non géré : simple log, ce n'est pas une erreur (console.log).
+            console.log(`⚠️ Événement non géré: ${event.type}`);
+        }
+      } catch (eventError) {
+        // Erreur applicative lors du traitement de l'événement.
+        // Décision : logger l'erreur mais répondre quand même 200 à Stripe pour
+        // éviter que Stripe réessaie indéfiniment un événement problématique côté app.
+        console.error(`❌ Erreur lors du traitement de l'événement ${event.type}:`, eventError);
       }
 
       // Répondre à Stripe que le webhook a été traité avec succès
+      // (uniquement après le traitement de l'événement, jamais avant)
       res.status(200).json({ 
         success: true,
         received: true,

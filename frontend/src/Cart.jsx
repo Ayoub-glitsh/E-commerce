@@ -1,4 +1,4 @@
-import { useContext } from "react";
+import { useEffect } from "react";
 import { Trash, Calculator, Lock, ShieldCheck, RotateCcw, Clock } from "lucide-react";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -11,6 +11,12 @@ function Cart() {
  const deleteProductFromCart=useCartStore(state=>state.deleteProductFromCart);
  const increaseQuantity=useCartStore(state=>state.increaseQuantity);
  const decreaseQuantity=useCartStore(state=>state.decreaseQuantity);
+ const fetchCart=useCartStore(state=>state.fetchCart);
+
+    // Charger le panier depuis le backend au montage du composant
+    useEffect(() => {
+        fetchCart();
+    }, [fetchCart]);
     
     const subtotal = cart.reduce(
         (sum, item) => sum + item.price * item.quantity,
