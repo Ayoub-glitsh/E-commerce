@@ -38,4 +38,7 @@ router.post('/products/:id/reviews',
   ReviewController.createReview
 );
 
+//review summary route
+router.get('/products/:id/review-summary', ReviewController.getReviewSummary);
+
 module.exports = router;

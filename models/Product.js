@@ -3,7 +3,8 @@
 module.exports = (sequelize, DataTypes) => {
   const Product = sequelize.define('Product', {
     id: {
-      type: DataTypes.TEXT, // UUID stocké comme TEXT (cohérence avec la DB existante)
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
       allowNull: false
     },
@@ -44,7 +45,7 @@ module.exports = (sequelize, DataTypes) => {
       }
     },
     categoryId: {
-      type: DataTypes.TEXT, // UUID de la catégorie
+      type: DataTypes.UUID, // UUID de la catégorie
       allowNull: false,
       field: 'category_id', // Mapping vers la colonne snake_case
       validate: {

@@ -2,11 +2,12 @@
 
 module.exports = (sequelize, DataTypes) => {
   const Category = sequelize.define('Category', {
-    id: {
-      type: DataTypes.TEXT, // UUID stocké comme TEXT (cohérence avec la DB existante)
+      id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
       allowNull: false
-    },
+  },
     name: {
       type: DataTypes.TEXT,
       allowNull: false,
