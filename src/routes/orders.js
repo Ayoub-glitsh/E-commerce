@@ -1,6 +1,6 @@
 const express = require('express');
 const OrderController = require('../controllers/orderController');
-const { verifyToken } = require('../middleware/auth');
+const { verifyToken, verifyAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -156,12 +156,92 @@ router.get('/:orderId', verifyToken, OrderController.getOrderById);
 router.get('/:orderId/transitions', verifyToken, OrderController.getOrderTransitions);
 
 /**
- * @route   PUT /api/orders/:orderId/status
- * @desc    Mettre à jour le statut d'une commande (machine à états)
+ * @route   PUT /api/orders/:orderId/cancel
+ * @desc    Annuler une commande (FonctionnalitéMoyenne#1782)
  * @access  Private (JWT required)
  * @headers Authorization: Bearer <accessToken>
  * @params  { orderId: string }
- * @body    { newStatus: "pending"|"confirmed"|"shipped"|"delivered" }
+ * @body    { reason?: string } (Raison d'annulation optionnelle)
+ * @returns {
+ *            success: boolean,
+ *            message: string,
+ *            data: {
+ *              orderId: string,
+ *              previousStatus: string,
+ *              currentStatus: "canceled",
+ *              canceledAt: datetime,
+ *              reason?: string,
+ *              updatedAt: datetime
+ *            }
+ *          }
+ * 
+ * Spécification FonctionnalitéMoyenne#1782:
+ * - Sous-tâche 1: Vérifier que status=pending avant d'autoriser (rejette sinon avec 400)
+ * - Sous-tâche 2: Créer champ canceledAt et passer status à 'canceled'
+ * 
+ * Comportement:
+ * - Seules les commandes en statut "pending" peuvent être annulées
+ * - Met automatiquement à jour canceledAt avec la date/heure actuelle
+ * - Ajoute une note d'annulation avec la date et raison (si fournie)
+ * - Retourne erreur 400 si tentative d'annulation sur statut != pending
+ * 
+ * Erreurs Possibles:
+ * - 400: Commande ne peut pas être annulée (status != pending)
+ * - 404: Commande non trouvée ou n'appartient pas à l'utilisateur
+ * - 401: Token manquant/invalide
+ */
+router.put('/:orderId/cancel', verifyToken, OrderController.cancelOrder);
+
+/**
+ * @route   GET /api/orders/:orderId/tracking
+ * @desc    Obtenir le suivi d'une commande (FonctionnalitéMoyenne#1782)
+ * @access  Private (JWT required)
+ * @headers Authorization: Bearer <accessToken>
+ * @params  { orderId: string }
+ * @returns {
+ *            success: boolean,
+ *            message: string,
+ *            data: {
+ *              orderId: string,
+ *              status: string,
+ *              createdAt: datetime,
+ *              confirmedAt?: datetime,
+ *              shippedAt?: datetime,
+ *              deliveredAt?: datetime,
+ *              canceledAt?: datetime,
+ *              trackingNumber?: string,
+ *              progress: {
+ *                isCompleted: boolean,
+ *                isCanceled: boolean,
+ *                currentStep: string,
+ *                timeline: array
+ *              }
+ *            }
+ *          }
+ * 
+ * Spécification FonctionnalitéMoyenne#1782:
+ * - Sous-tâche 3: Retourner état actuel simplifié (pending/confirmed/shipped/delivered/canceled)
+ * - Format: { status, createdAt, confirmedAt, shippedAt, deliveredAt, canceledAt }
+ * 
+ * Fonctionnalités Optionnelles S6:
+ * - Timeline visuelle avec progression étape par étape
+ * - Informations de statut enrichies
+ * - Support du statut "canceled" avec canceledAt
+ * 
+ * Utilisation:
+ * - Interface de suivi client simplifié
+ * - État en temps réel de la commande
+ * - Historique des transitions avec dates
+ */
+router.get('/:orderId/tracking', verifyToken, OrderController.getOrderTracking);
+
+/**
+ * @route   PUT /api/orders/:orderId/status
+ * @desc    Mettre à jour le statut d'une commande (machine à états)
+ * @access  Admin only (JWT + verifyAdmin) - action de gestion réservée aux admins
+ * @headers Authorization: Bearer <accessToken>
+ * @params  { orderId: string }
+ * @body    { newStatus: "pending"|"confirmed"|"shipped"|"delivered"|"canceled" }
  * @returns {
  *            success: boolean,
  *            message: string,
@@ -175,23 +255,26 @@ router.get('/:orderId/transitions', verifyToken, OrderController.getOrderTransit
  *            }
  *          }
  * 
- * Machine à États (Transitions Valides):
- * - pending → confirmed
- * - confirmed → shipped  
+ * Machine à États Mise à Jour (FonctionnalitéMoyenne#1782):
+ * - pending → confirmed | canceled
+ * - confirmed → shipped
  * - shipped → delivered
  * - delivered → [] (état final)
+ * - canceled → [] (état final)
  * 
  * Comportement:
  * - Valide que la transition est autorisée selon la machine à états
  * - Rejette avec erreur 400 les transitions invalides
  * - Génère automatiquement un trackingNumber si passage à "shipped"
+ * - Met à jour les dates de transition (confirmedAt, shippedAt, deliveredAt, canceledAt)
  * - Ajoute des notes automatiques pour certains statuts
  * 
- * Erreurs Possibles:
+* Erreurs Possibles:
  * - 400: Statut invalide ou transition non autorisée
  * - 404: Commande non trouvée
  * - 401: Token manquant/invalide
+ * - 403: Accès refusé (privilèges admin requis) - fix sécurité FonctionnalitéHaute#427
  */
-router.put('/:orderId/status', verifyToken, OrderController.updateOrderStatus);
+router.put('/:orderId/status', verifyToken, verifyAdmin, OrderController.updateOrderStatus);
 
 module.exports = router;

@@ -2,6 +2,7 @@ require('dotenv').config();
 console.log("JWT_SECRET =", process.env.JWT_SECRET);
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 
 
 // Importation des routes
@@ -15,6 +16,12 @@ const orderRoutes = require('./routes/orders');
 const recommendationRoutes = require('./routes/recommendations');
 const eventRoutes = require('./routes/events');
 const searchRoutes = require('./routes/search');
+const paymentRoutes = require('./routes/payments');
+const webhookRoutes = require('./routes/webhooks');
+const internalChatbotRoutes = require('./routes/internalChatbotRoutes');
+
+// Importation des middlewares
+const rawBodyMiddleware = require('./middleware/rawBody');
 
 // Initialisation de l'application Express
 const app = express();
@@ -29,6 +36,9 @@ app.use(cors({
   credentials: true
 }));
 
+// Middleware pour raw body sur les webhooks (avant express.json())
+app.use(rawBodyMiddleware);
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -37,6 +47,9 @@ app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
   next();
 });
+
+// Servir les fichiers uploadés (images de produits) en statique
+app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
 
 /**
  * Configuration des routes principales
@@ -81,6 +94,16 @@ app.use('/events', eventRoutes);
 
 // Routes de recherche (NLP + classique)
 app.use('/search', searchRoutes);
+// Routes des paiements (FonctionnalitéHaute#1780)
+app.use('/api/payments', paymentRoutes);
+
+// Routes des webhooks (FonctionnalitéHaute#1781)
+app.use('/webhooks', webhookRoutes);
+
+// Routes internes du chatbot IA (FonctionnalitéHaute#1671)
+// ⚠️ Accès interne uniquement (Flask chatbot → Node, réseau local).
+// En production : restreindre l'accès (clé interne partagée ou IP/réseau).
+app.use('/api/internal', internalChatbotRoutes);
 
 // Route de test de la base de données
 app.get('/api/test-db', async (req, res) => {
@@ -179,6 +202,10 @@ app.use((req, res) => {
       'GET /recommendations/for-you',
       'POST /search/nlp',
       'GET /search',
+      'POST /api/payments/create-intent (AUTH)',
+      'GET /api/payments/config',
+      'POST /api/payments/webhook',
+      'POST /webhooks/stripe'
     ]
   });
 });

@@ -9,8 +9,7 @@ import toast from "react-hot-toast"; // Pour les notifications
 function Checkout() {
   const navigate = useNavigate(); // Permet de rediriger l'utilisateur après le paiement
   const cart = useCartStore(state => state.cart);
-  const clearCart = useCartStore(state => state.clearCart); 
-  const addOrder = useCartStore(state => state.addOrder); 
+  const createOrder = useCartStore(state => state.createOrder);
 
   const schema = z.object({
       FullName: z.string().min(1, "Name cannot be empty"),
@@ -35,32 +34,74 @@ function Checkout() {
   const tax = subtotal * 0.2;
   const total = subtotal + tax;
 
-  const onSubmit = (data) => {
+const onSubmit = async (data) => {
       if (cart.length === 0) {
           toast.error("Your cart is empty!");
           return;
       }
 
-      // Création de la commande complète avec le nom du client
-      const newOrder = {
-          id: `CMD-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000)}`,
-          date: new Date().toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }),
-          status: "En préparation", 
-          total: total,
-          customer: data.FullName, // Ajout du nom du client pour le Dashboard Admin
-          address: `${data.address}, ${data.postalCode} ${data.city}`, 
-          items: [...cart]
+      // Préparer les données d'adresse de livraison envoyées au backend
+      const orderData = {
+          shippingAddress: {
+              fullName: data.FullName,
+              email: data.email,
+              phone: data.phone,
+              address: data.address,
+              city: data.city,
+              postalCode: data.postalCode,
+          },
+          paymentMethod: 'card',
       };
 
-      addOrder(newOrder); 
-      clearCart();        
-      
-      toast.success("Order placed successfully!", {
-          style: { background: '#22c55e', color: '#fff', fontWeight: '500' },
-          iconTheme: { primary: '#fff', secondary: '#22c55e' },
-      });
-      
-      navigate('/orders'); // Redirige vers la page /orders (ou /historique selon votre route)
+      // 1. Créer la commande côté backend (POST /api/orders)
+      //    Retourne { orderId, total, status }
+      const result = await createOrder(orderData);
+
+      if (!result || !result.orderId) {
+          // La fonction createOrder affiche déjà un toast.error en cas d'échec
+          return;
+      }
+
+      // 2. Lancer le paiement Stripe (POST /api/payments/create-intent)
+      //    avec l'orderId et le montant total retourné par le backend
+      try {
+          const stripeRes = await fetch('/api/payments/create-intent', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${localStorage.getItem('token')}`,
+              },
+              body: JSON.stringify({
+                  orderId: result.orderId,
+                  amount: result.total || total,
+                  currency: 'eur',
+              }),
+          });
+
+          const stripeJson = await stripeRes.json();
+
+          if (!stripeRes.ok) {
+              toast.error(stripeJson?.message || "Erreur lors de l'initialisation du paiement", {
+                  style: { background: '#ef4444', color: '#fff', fontWeight: '500' },
+              });
+              return;
+          }
+
+          // Le PaymentIntent a été créé avec succès
+          console.log('PaymentIntent créé:', stripeJson?.data?.client_secret);
+
+          toast.success("Order placed successfully!", {
+              style: { background: '#22c55e', color: '#fff', fontWeight: '500' },
+              iconTheme: { primary: '#fff', secondary: '#22c55e' },
+          });
+
+          navigate('/orders'); // Redirige vers la page /orders
+      } catch (err) {
+          console.error('Erreur paiement Stripe:', err);
+          toast.error("Erreur réseau lors du paiement", {
+              style: { background: '#ef4444', color: '#fff', fontWeight: '500' },
+          });
+      }
   }
 
   return (

@@ -1,10 +1,17 @@
 import { Package, ChevronRight, Search, Filter } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useEffect } from 'react';
 import useCartStore from './store/cartStore'; // Import du store
 
 function Orders() {
     // Lecture directe depuis Zustand
     const orders = useCartStore((state) => state.orders) || [];
+    const fetchOrders = useCartStore((state) => state.fetchOrders);
+
+    // Charger les commandes depuis le backend au montage du composant
+    useEffect(() => {
+        fetchOrders();
+    }, [fetchOrders]);
 
     const getStatusColor = (status) => {
         switch(status) {

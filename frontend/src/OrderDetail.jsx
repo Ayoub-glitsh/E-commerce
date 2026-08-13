@@ -1,11 +1,28 @@
 import { useParams, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { Package, Truck, CheckCircle2, ChevronLeft, MapPin } from 'lucide-react';
 import useCartStore from './store/cartStore'; // Import du store
 
 function OrderDetail() {
     const { id } = useParams();
-    const orders = useCartStore((state) => state.orders) || [];
-    const order = orders.find((o) => o.id === id);
+    const fetchOrder = useCartStore((state) => state.fetchOrder);
+    const [order, setOrder] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    // Charger la commande spécifique depuis le backend au montage
+    useEffect(() => {
+        let mounted = true;
+        async function load() {
+            setLoading(true);
+            const found = await fetchOrder(id);
+            if (mounted) {
+                setOrder(found || null);
+                setLoading(false);
+            }
+        }
+        load();
+        return () => { mounted = false; };
+    }, [id, fetchOrder]);
 
     const getStatusColor = (status) => {
         switch(status) {
@@ -16,6 +33,15 @@ function OrderDetail() {
             default: return 'bg-gray-100 text-gray-700 border-gray-200';
         }
     };
+
+if (loading) {
+        return (
+            <div className="max-w-7xl mx-auto px-6 py-20 text-center">
+                <h2 className="text-2xl font-bold text-gray-900">Chargement...</h2>
+                <p className="text-gray-500 mt-2">Récupération de la commande en cours.</p>
+            </div>
+        );
+    }
 
     if (!order) {
         return (
