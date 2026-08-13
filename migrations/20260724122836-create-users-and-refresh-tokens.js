@@ -6,19 +6,21 @@ module.exports = {
     // Créer seulement la table refresh_tokens (users existe déjà)
     await queryInterface.createTable('refresh_tokens', {
       id: {
-        type: Sequelize.TEXT,
+        type: Sequelize.UUID,
+        defaultValue: Sequelize.UUIDV4,
         primaryKey: true,
         allowNull: false
       },
+
       user_id: {
-        type: Sequelize.TEXT,
+        type: Sequelize.UUID,
         allowNull: false,
         references: {
           model: 'users',
           key: 'id'
         },
-        onUpdate: 'CASCADE',
-        onDelete: 'CASCADE'
+        onDelete: 'CASCADE',
+        onUpdate: 'CASCADE'
       },
       token: {
         type: Sequelize.TEXT,

@@ -1,7 +1,9 @@
 require('dotenv').config();
+console.log("JWT_SECRET =", process.env.JWT_SECRET);
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+
 
 // Importation des routes
 const authRoutes = require('./routes/auth');
@@ -11,6 +13,9 @@ const reviewRoutes = require('./routes/reviews');
 const cartRoutes = require('./routes/cart');
 const wishlistRoutes = require('./routes/wishlist');
 const orderRoutes = require('./routes/orders');
+const recommendationRoutes = require('./routes/recommendations');
+const eventRoutes = require('./routes/events');
+const searchRoutes = require('./routes/search');
 const paymentRoutes = require('./routes/payments');
 const webhookRoutes = require('./routes/webhooks');
 const internalChatbotRoutes = require('./routes/internalChatbotRoutes');
@@ -21,6 +26,7 @@ const rawBodyMiddleware = require('./middleware/rawBody');
 // Initialisation de l'application Express
 const app = express();
 const PORT = process.env.PORT || 3000;
+
 
 /**
  * Configuration des middlewares globaux
@@ -80,6 +86,14 @@ app.use('/api/wishlist', wishlistRoutes);
 // Routes des commandes (authentification requise)
 app.use('/api/orders', orderRoutes);
 
+// Routes de recommandations (publiques)
+app.use('/recommendations', recommendationRoutes);
+
+//Routes de events
+app.use('/events', eventRoutes);
+
+// Routes de recherche (NLP + classique)
+app.use('/search', searchRoutes);
 // Routes des paiements (FonctionnalitéHaute#1780)
 app.use('/api/payments', paymentRoutes);
 
@@ -182,6 +196,12 @@ app.use((req, res) => {
       'DELETE /api/wishlist/:productId',
       'DELETE /api/wishlist',
       'GET /api/wishlist/check/:productId',
+      'GET /recommendations/similar/:product_id',
+      'POST /events/view',
+      'POST /events/purchase',
+      'GET /recommendations/for-you',
+      'POST /search/nlp',
+      'GET /search',
       'POST /api/payments/create-intent (AUTH)',
       'GET /api/payments/config',
       'POST /api/payments/webhook',
@@ -228,3 +248,4 @@ if (require.main === module) {
 }
 
 module.exports = app;
+console.log("App.js reached the end");
