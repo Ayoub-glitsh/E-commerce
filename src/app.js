@@ -1,13 +1,22 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 
 // Importation des routes
 const authRoutes = require('./routes/auth');
 const catalogRoutes = require('./routes/catalog');
 const adminRoutes = require('./routes/admin');
 const reviewRoutes = require('./routes/reviews');
-// const cartRoutes = require('./controllers/cartController');
+const cartRoutes = require('./routes/cart');
+const wishlistRoutes = require('./routes/wishlist');
+const orderRoutes = require('./routes/orders');
+const paymentRoutes = require('./routes/payments');
+const webhookRoutes = require('./routes/webhooks');
+const internalChatbotRoutes = require('./routes/internalChatbotRoutes');
+
+// Importation des middlewares
+const rawBodyMiddleware = require('./middleware/rawBody');
 
 // Initialisation de l'application Express
 const app = express();
@@ -21,6 +30,9 @@ app.use(cors({
   credentials: true
 }));
 
+// Middleware pour raw body sur les webhooks (avant express.json())
+app.use(rawBodyMiddleware);
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -29,6 +41,9 @@ app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
   next();
 });
+
+// Servir les fichiers uploadés (images de produits) en statique
+app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
 
 /**
  * Configuration des routes principales
@@ -56,8 +71,25 @@ app.use('/api', reviewRoutes);
 // Routes d'administration (admin uniquement)
 app.use('/api/admin', adminRoutes);
 
-// Routes du panier (temporairement désactivées)
-// app.use('/api/cart', cartRoutes);
+// Routes du panier (authentification requise)
+app.use('/api/cart', cartRoutes);
+
+// Routes de la wishlist (authentification requise)
+app.use('/api/wishlist', wishlistRoutes);
+
+// Routes des commandes (authentification requise)
+app.use('/api/orders', orderRoutes);
+
+// Routes des paiements (FonctionnalitéHaute#1780)
+app.use('/api/payments', paymentRoutes);
+
+// Routes des webhooks (FonctionnalitéHaute#1781)
+app.use('/webhooks', webhookRoutes);
+
+// Routes internes du chatbot IA (FonctionnalitéHaute#1671)
+// ⚠️ Accès interne uniquement (Flask chatbot → Node, réseau local).
+// En production : restreindre l'accès (clé interne partagée ou IP/réseau).
+app.use('/api/internal', internalChatbotRoutes);
 
 // Route de test de la base de données
 app.get('/api/test-db', async (req, res) => {
@@ -144,7 +176,16 @@ app.use((req, res) => {
       'POST /api/cart/add',
       'PUT /api/cart/update',
       'DELETE /api/cart/remove',
-      'DELETE /api/cart/clear'
+      'DELETE /api/cart/clear',
+      'GET /api/wishlist',
+      'POST /api/wishlist',
+      'DELETE /api/wishlist/:productId',
+      'DELETE /api/wishlist',
+      'GET /api/wishlist/check/:productId',
+      'POST /api/payments/create-intent (AUTH)',
+      'GET /api/payments/config',
+      'POST /api/payments/webhook',
+      'POST /webhooks/stripe'
     ]
   });
 });

@@ -271,7 +271,7 @@ class CatalogController {
 
       // Configuration de base
       const queryOptions = {
-        attributes: ['id', 'name', 'description', 'createdAt', 'updatedAt'],
+        attributes: ['id', 'name', 'description', 'created_at', 'updated_at'],
         order: [['name', 'ASC']]
       };
 

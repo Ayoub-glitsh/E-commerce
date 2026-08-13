@@ -5,7 +5,7 @@
  */
 
 require('dotenv').config();
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const { User, sequelize } = require('../models');
 const { v4: uuidv4 } = require('uuid');
 

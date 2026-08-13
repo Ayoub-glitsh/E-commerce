@@ -3,13 +3,7 @@ import { Link } from "react-router-dom";
 import { useContext, useEffect,useState } from "react";
 import { Heart } from "lucide-react";
 import useCartStore from "./store/cartStore";
-
-
-
-
 function Navbar(){
-  
-    
      const cart=useCartStore(state=>state.cart);
      const wishList=useCartStore(state=>state.wish);
 
@@ -34,12 +28,12 @@ function Navbar(){
               <div className="hidden md:flex items-center gap-8">
                   <Link to="/" className="text-sm text-gray-600 hover:text-indigo-600 transition-colors">Home</Link>
                   <Link to="/products" className="text-sm text-gray-600 hover:text-indigo-600 transition-colors">Products</Link>
-                  <Link to="/categories" className="text-sm text-gray-600 hover:text-indigo-600 transition-colors">Categories</Link>
+                  <Link to="/orders" className="text-sm text-gray-600 hover:text-indigo-600 transition-colors">Orders</Link>
                   <Link to="/deals" className="text-sm text-gray-600 hover:text-indigo-600 transition-colors">Deals</Link>
               </div>
 
               <div className="flex items-center gap-3">
-                  <button className="text-sm text-gray-600 hover:text-indigo-600 transition-colors px-3 py-2">Sign in</button>
+                  <Link to="/login"><button className="text-sm text-gray-600 hover:text-indigo-600 transition-colors px-3 py-2">Sign in</button></Link>
                  <Link to="/cart">
                        <button className="text-sm bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-indigo-600 transition-colors shadow-sm">Cart:{totalQuantity}</button>
 
