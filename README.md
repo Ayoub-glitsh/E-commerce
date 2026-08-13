@@ -482,6 +482,21 @@ Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de 
 </a>
 </td>
 
+<!-- Ajoutez les autres développeurs ici -->
+</tr>
+
+
+
+
+<tr>
+<td align="center">
+<a href="https://github.com/1Oumaima1">
+<img src="https://github.com/1Oumaima1.png" width="100px;" alt="Oumaima Amlou"/><br />
+<sub><b>Ayoub Aguezar</b></sub><br />
+<sub>Software & AI Engineer</sub>
+</a>
+</td>
+  
 
 
 <!-- Ajoutez les autres développeurs ici -->
