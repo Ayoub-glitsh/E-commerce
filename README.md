@@ -489,11 +489,20 @@ Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de 
 
 
 <tr>
+  
 <td align="center">
 <a href="https://github.com/1Oumaima1">
 <img src="https://github.com/1Oumaima1.png" width="100px;" alt="Oumaima Amlou"/><br />
 <sub><b>Oumaima Amlou</b></sub><br />
 <sub>Software & AI Engineer</sub>
+</a>
+</td>
+
+<td align="center">
+<a href="https://github.com/MeryemElkannaa">
+<img src="https://github.com/MeryemElkannaa.png" width="100px;" alt="Meryem El Kannaa"/><br/>
+<sub><b>Meryem El Kannaa</b></sub><br/>
+<sub>Software Engineer</sub>
 </a>
 </td>
   
